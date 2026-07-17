@@ -1,0 +1,79 @@
+name: Target Promotion - Container Apps
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Formal Paired Release Tag to propose for container-apps
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  attestations: read
+
+concurrency:
+  group: container-apps-release-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote-container-apps:
+    runs-on: ubuntu-24.04
+    env:
+      PRODUCT_REPOSITORY: optiplex331/Halligalli-BossYang
+      DESIRED_STATE_PATH: deployment/container-apps/desired-state.json
+      PROMOTION_BRANCH: automation/container-apps-promotion
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+      - name: Resolve formal release
+        env:
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: python3 .github/utils/prepare_release_promotion.py resolve --release-tag "${REQUESTED_RELEASE_TAG}" --promotion-branch automation/container-apps-promotion
+      - name: Download Paired Release Manifest
+        run: curl --fail --location --silent --show-error "${ASSET_URL}" --output paired-release-manifest.json
+      - name: Verify manifest binding
+        id: candidate
+        run: python3 .github/utils/prepare_release_promotion.py inspect --manifest paired-release-manifest.json --expected-tag "${RELEASE_TAG}" --candidate-output release-candidate.json
+      - name: Verify Web artifact provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh attestation verify "oci://${{ steps.candidate.outputs.web_repository }}@${{ steps.candidate.outputs.web_digest }}" --repo "${PRODUCT_REPOSITORY}" --signer-workflow "${PRODUCT_REPOSITORY}/.github/workflows/container.yml" --source-ref "refs/tags/${RELEASE_TAG}" --source-digest "${{ steps.candidate.outputs.commit }}" --deny-self-hosted-runners
+      - name: Verify API artifact provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh attestation verify "oci://${{ steps.candidate.outputs.api_repository }}@${{ steps.candidate.outputs.api_digest }}" --repo "${PRODUCT_REPOSITORY}" --signer-workflow "${PRODUCT_REPOSITORY}/.github/workflows/container.yml" --source-ref "refs/tags/${RELEASE_TAG}" --source-digest "${{ steps.candidate.outputs.commit }}" --deny-self-hosted-runners
+      - name: Smoke digest-pinned paired candidate
+        run: |
+          python3 .github/utils/prepare_release_promotion.py inspect-dependencies --values "${DESIRED_STATE_PATH}"
+          python3 -m unittest discover -s .github/utils/tests -p 'test_*.py'
+      - name: Prepare container-apps desired state only
+        run: python3 .github/utils/prepare_release_promotion.py prepare --candidate release-candidate.json --values "${DESIRED_STATE_PATH}" --output promoted-container-apps.json
+      - name: Create target-scoped promotion branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "${PROMOTION_BRANCH}" >/dev/null 2>&1; then
+            git fetch origin "${PROMOTION_BRANCH}:${PROMOTION_BRANCH}"
+            git switch "${PROMOTION_BRANCH}"
+            git reset --hard origin/main
+          else
+            git switch --create "${PROMOTION_BRANCH}"
+          fi
+          cp promoted-container-apps.json "${DESIRED_STATE_PATH}"
+          git add "${DESIRED_STATE_PATH}"
+          test "$(git diff --cached --name-only)" = "${DESIRED_STATE_PATH}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(container-apps): promote Halligalli ${RELEASE_TAG}"
+          git push --force-with-lease origin "HEAD:refs/heads/${PROMOTION_BRANCH}"
+      - name: Create or update Draft target promotion PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="chore(container-apps): promote Halligalli ${RELEASE_TAG}"
+          body="Target Promotion for the container-apps Live Demo Environment. This Draft changes only ${DESIRED_STATE_PATH}; it does not modify AKS desired state or deploy to Azure."
+          number="$(gh pr list --base main --head "${PROMOTION_BRANCH}" --state open --json number --jq '.[0].number // empty')"
+          if test -n "${number}"; then gh pr edit "${number}" --title "${title}" --body "${body}"; else gh pr create --base main --head "${PROMOTION_BRANCH}" --title "${title}" --body "${body}" --draft; fi

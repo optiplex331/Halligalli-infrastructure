@@ -1,0 +1,161 @@
+---
+name: Target Promotion - AKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Formal paired Halligalli Release Tag to validate and propose
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  attestations: read
+
+concurrency:
+  group: aks-release-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Validate paired release and draft proof promotion
+    runs-on: ubuntu-24.04
+    env:
+      PRODUCT_REPOSITORY: optiplex331/Halligalli-BossYang
+      VALUES_PATH: gitops/aks/values/halligalli.values.json
+      CANDIDATE_NETWORK: halligalli-promotion-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Check out Infrastructure Repo
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.2.2
+
+      - name: Resolve release inputs
+        env:
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: >-
+          python3 .github/utils/prepare_release_promotion.py resolve
+          --release-tag "${REQUESTED_RELEASE_TAG}"
+
+      - name: Download public Paired Release Manifest
+        run: >-
+          curl --fail --location --silent --show-error
+          "${ASSET_URL}" --output paired-release-manifest.json
+
+      - name: Inspect schema-V2 Paired Release Manifest
+        id: candidate
+        run: >-
+          python3 .github/utils/prepare_release_promotion.py inspect
+          --manifest paired-release-manifest.json
+          --expected-tag "${RELEASE_TAG}"
+          --candidate-output release-candidate.json
+
+      - name: Verify Web artifact provenance
+        run: >-
+          gh attestation verify "oci://${{ steps.candidate.outputs.web_repository }}@${{ steps.candidate.outputs.web_digest }}"
+          --repo "${PRODUCT_REPOSITORY}"
+          --signer-workflow "${PRODUCT_REPOSITORY}/.github/workflows/container.yml"
+          --source-ref "refs/tags/${RELEASE_TAG}"
+          --source-digest "${{ steps.candidate.outputs.commit }}"
+          --deny-self-hosted-runners
+
+      - name: Verify API artifact provenance
+        run: >-
+          gh attestation verify "oci://${{ steps.candidate.outputs.api_repository }}@${{ steps.candidate.outputs.api_digest }}"
+          --repo "${PRODUCT_REPOSITORY}"
+          --signer-workflow "${PRODUCT_REPOSITORY}/.github/workflows/container.yml"
+          --source-ref "refs/tags/${RELEASE_TAG}"
+          --source-digest "${{ steps.candidate.outputs.commit }}"
+          --deny-self-hosted-runners
+
+      - name: Inspect digest-pinned runtime dependencies
+        id: dependencies
+        run: >-
+          python3 .github/utils/prepare_release_promotion.py inspect-dependencies
+          --values "${VALUES_PATH}"
+
+      - name: Smoke digest-pinned candidate runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          cleanup() { docker rm --force paired-web paired-api paired-redis >/dev/null 2>&1 || true; docker network rm "${CANDIDATE_NETWORK}" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          docker network create "${CANDIDATE_NETWORK}"
+          docker run --detach --name paired-redis --network "${CANDIDATE_NETWORK}" "${{ steps.dependencies.outputs.redis_repository }}@${{ steps.dependencies.outputs.redis_digest }}" redis-server --save '' --appendonly no
+          docker run --detach --name paired-api --network "${CANDIDATE_NETWORK}" --publish 18000:8000 -e HALLIGALLI_REDIS_URL=redis://paired-redis:6379/0 "${{ steps.candidate.outputs.api_repository }}@${{ steps.candidate.outputs.api_digest }}"
+          docker run --detach --name paired-web --network "${CANDIDATE_NETWORK}" --publish 18080:8080 -e HALLIGALLI_API_ORIGIN=http://paired-api:8000 "${{ steps.candidate.outputs.web_repository }}@${{ steps.candidate.outputs.web_digest }}"
+          for _ in 1 2 3 4 5 6 7 8 9 10; do
+            if curl --fail --silent http://localhost:18000/internal/ready >/dev/null && curl --fail --silent http://localhost:18080/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://localhost:18000/internal/ready >/dev/null
+          curl --fail --silent http://localhost:18080/ >/dev/null
+          proxy_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --request POST --header 'Content-Type: application/json' --data '{}' http://localhost:18080/api/v1/rooms)"
+          [[ "${proxy_status}" == "401" || "${proxy_status}" == "422" ]]
+          docker rm --force paired-web paired-api paired-redis >/dev/null
+          docker network rm "${CANDIDATE_NETWORK}" >/dev/null
+          trap - EXIT
+
+      - name: Prepare paired desired state
+        id: promotion
+        run: >-
+          python3 .github/utils/prepare_release_promotion.py prepare
+          --candidate release-candidate.json
+          --values "${VALUES_PATH}" --output promoted-halligalli.values.json
+
+      - name: Select idempotent promotion branch
+        id: branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "${PROMOTION_BRANCH}" >/dev/null 2>&1; then git fetch origin "${PROMOTION_BRANCH}:${PROMOTION_BRANCH}"; git switch "${PROMOTION_BRANCH}"; else git switch --create "${PROMOTION_BRANCH}"; fi
+          cp promoted-halligalli.values.json "${VALUES_PATH}"
+          git show "origin/main:${VALUES_PATH}" > main-halligalli.values.json
+          python3 .github/utils/prepare_release_promotion.py assess-promotion --promoted-values "${VALUES_PATH}" --main-values main-halligalli.values.json
+
+      - name: Validate promoted desired state
+        if: steps.branch.outputs.promotion_required == 'true'
+        run: |
+          python3 -m unittest discover -s .github/utils/tests -p 'test_*.py'
+          helm template halligalli gitops/aks/chart/halligalli --values "${VALUES_PATH}" > /tmp/halligalli-rendered.yaml
+
+      - name: Validate existing promotion PR state
+        if: steps.branch.outputs.promotion_required == 'true'
+        id: existing_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr list --repo "${GITHUB_REPOSITORY}" --base main --head "${PROMOTION_BRANCH}" --state open --limit 2 --json number,state,isDraft,url > open-promotion-prs.json
+          python3 .github/utils/prepare_release_promotion.py inspect-pr --input open-promotion-prs.json
+
+      - name: Commit and push promotion branch
+        if: steps.branch.outputs.promotion_required == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add "${VALUES_PATH}"
+          staged_files="$(git diff --cached --name-only)"
+          [[ -z "${staged_files}" || "${staged_files}" == "${VALUES_PATH}" ]] || { echo "Promotion may change only ${VALUES_PATH}" >&2; exit 1; }
+          branch_files="$({ git diff --name-only "origin/main...HEAD"; git diff --cached --name-only; } | sort -u)"
+          [[ "${branch_files}" == "${VALUES_PATH}" ]] || { echo "Promotion branch contains changes outside ${VALUES_PATH}: ${branch_files}" >&2; exit 1; }
+          if ! git diff --cached --quiet; then git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"; git commit -m "chore(gitops): promote Halligalli ${RELEASE_TAG}"; git push origin "HEAD:refs/heads/${PROMOTION_BRANCH}"; fi
+
+      - name: Create or update Draft promotion PR
+        if: steps.branch.outputs.promotion_required == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="chore(gitops): promote Halligalli ${RELEASE_TAG}"
+          python3 .github/utils/prepare_release_promotion.py render-pr --release-tag "${RELEASE_TAG}" --commit "${{ steps.candidate.outputs.commit }}" --web-repository "${{ steps.candidate.outputs.web_repository }}" --web-digest "${{ steps.candidate.outputs.web_digest }}" --api-repository "${{ steps.candidate.outputs.api_repository }}" --api-digest "${{ steps.candidate.outputs.api_digest }}" --asset-url "${ASSET_URL}" --manifest-sha256 "${{ steps.candidate.outputs.manifest_sha256 }}" --output /tmp/promotion-pr.md
+          existing_number="${{ steps.existing_pr.outputs.number }}"
+          if [[ -n "${existing_number}" ]]; then gh pr edit "${existing_number}" --repo "${GITHUB_REPOSITORY}" --title "${title}" --body-file /tmp/promotion-pr.md; else gh pr create --repo "${GITHUB_REPOSITORY}" --base main --head "${PROMOTION_BRANCH}" --title "${title}" --body-file /tmp/promotion-pr.md --draft; fi

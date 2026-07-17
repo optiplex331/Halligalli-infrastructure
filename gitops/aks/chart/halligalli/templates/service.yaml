@@ -1,0 +1,17 @@
+{{- range $component := list "web" "api" "redis" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: halligalli-{{ $component }}
+  labels:
+    {{- include "halligalli.labels" $ | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: {{ ternary "redis" "http" (eq $component "redis") }}
+      port: {{ ternary 6379 80 (eq $component "redis") }}
+      targetPort: {{ ternary "redis" "http" (eq $component "redis") }}
+  selector:
+    {{- include "halligalli.selectorLabels" (dict "component" $component) | nindent 4 }}
+---
+{{- end }}

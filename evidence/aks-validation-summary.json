@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "runDate": "2026-07-13",
+  "release": {
+    "releaseTag": "v0.7.2",
+    "productCommit": "23cb9f6a3781ec2c7a51c508d6d362f5910d8f5f",
+    "webDigest": "sha256:66aa63c8067c96cf966165807fbd65f2ce47d9ef94a36f8a8a88040631e9bf30",
+    "apiDigest": "sha256:3b526dca2be34c9f6cf0c803f1d14f506ef5a412a3b3e834e29b36cfad05ee09",
+    "redisDigest": "sha256:62b5498c91778f738f0efbf0a6fd5b434011235a3e7b5f2ed4a2c0c63bb1c786"
+  },
+  "dependencies": {
+    "prometheusDigest": "sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893",
+    "grafanaDigest": "sha256:121a7a9ece6dc10b969f1f96eed64b4f07dfac0d0b8abc070f7cb83bbde86f63",
+    "collectorDigest": "sha256:125bdbeb7590cc1952c5b3430ecf14063568980c2c93d5b38676cc0446ed8108",
+    "tempoDigest": "sha256:cda87c212d8c584dc0b89e337e7ed648a5100feb657e5d528480ee4fa03dbbe3"
+  },
+  "runtime": {
+    "nodeCount": 2,
+    "webReplicas": 2,
+    "apiReplicas": 2,
+    "observability": ["Prometheus", "Grafana", "OpenTelemetry Collector", "Tempo"]
+  },
+  "checks": {
+    "sameOriginJourneys": "passed",
+    "apiDisruption": "passed",
+    "nonRedisNodeDrain": "passed",
+    "redisLoss": "passed",
+    "gitopsDriftCorrection": "passed",
+    "pairedRollback": "passed",
+    "dashboardLogTrace": "passed",
+    "destroyAndInventory": "passed"
+  },
+  "retention": {
+    "liveWorkloadRetained": false,
+    "rawEvidencePublished": false
+  }
+}
