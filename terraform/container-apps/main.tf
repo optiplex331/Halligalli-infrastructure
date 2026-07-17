@@ -20,16 +20,6 @@ resource "azurerm_container_app" "live_demo" {
     target_port      = 8080
     transport        = "auto"
 
-    dynamic "custom_domain" {
-      for_each = var.environment_certificate_id == null ? [] : [var.environment_certificate_id]
-
-      content {
-        name                     = var.custom_domain_name
-        certificate_binding_type = "SniEnabled"
-        certificate_id           = custom_domain.value
-      }
-    }
-
     traffic_weight {
       revision_suffix = "bootstrap"
       percentage      = 100

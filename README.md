@@ -10,7 +10,7 @@ This repository owns Terraform, target-specific Deployment Desired State, indepe
 
 | Target | Current role | Delivery model |
 |---|---|---|
-| `container-apps` | Intended continuously available Live Demo at `play.halligalli.games`; live activation is not proven by repository state | PR-gated IaC/CD with revision-safe post-merge deployment |
+| `container-apps` | Continuously available Live Demo at `play.halligalli.games` | PR-gated desired state with an explicit local operator deployment |
 | `aks` | Maintained deployment-capable target; last verified baseline `v0.7.2` | Target-scoped promotion and Argo CD GitOps reconciliation during approved validation runs |
 
 Development Images are diagnostic only and cannot enter either formal promotion lane. One promotion changes exactly one target's desired-state file.
@@ -19,8 +19,8 @@ Development Images are diagnostic only and cannot enter either formal promotion 
 
 - `main` accepts changes through pull requests, requires the static validation check, requires resolved review conversations, and rejects force-pushes and deletion.
 - Promotion workflows verify paired Web/API digests and GitHub artifact provenance before opening target-scoped Draft PRs. They cannot merge those PRs.
-- The `container-apps` and `aks` GitHub Environments allow deployments only from protected branches and require an explicit review from the repository owner.
-- `AZURE_CREDENTIALS`, when configured, belongs only to the target Environment that consumes it. The service principal must be scoped to the target resource group and must not receive subscription-wide roles.
+- Container Apps deployment is deliberately not executed by GitHub Actions. The operator reviews and merges desired state, signs in locally with `az login`, and runs [`scripts/deploy-container-apps.sh`](scripts/deploy-container-apps.sh).
+- No Azure credential, user refresh token, service-principal secret, or publish profile is stored in GitHub.
 - Actions are restricted to GitHub-owned and verified publishers. Every referenced action is pinned to a full commit SHA.
 
 ## Local validation
