@@ -1,0 +1,5 @@
+web_image   = "ghcr.io/optiplex331/halligalli-bossyang-web@sha256:replace"
+api_image   = "ghcr.io/optiplex331/halligalli-bossyang-api@sha256:replace"
+redis_image = "docker.io/library/redis@sha256:replace"
+environment_certificate_id = "/subscriptions/replace/resourceGroups/halligalli-container-apps/providers/Microsoft.App/managedEnvironments/halligalli-live-demo/certificates/replace"
+monthly_budget_target_usd   = 25

@@ -1,0 +1,36 @@
+name: Monitor Live Demo
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: monitor-live-demo
+  cancel-in-progress: true
+
+jobs:
+  public-uptime:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Check external HTTPS and WebSocket surfaces
+        id: external-monitor
+        continue-on-error: true
+        run: python3 .github/utils/external_monitor.py --origin https://play.halligalli.games
+      - name: Synchronize notification incident
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 .github/utils/external_monitor_incident.py \
+            --status "${{ steps.external-monitor.outcome }}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+      - name: Report external monitor failure
+        if: always() && steps.external-monitor.outcome == 'failure'
+        run: exit 1

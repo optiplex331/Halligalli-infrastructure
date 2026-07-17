@@ -1,0 +1,6 @@
+apiVersion: v2
+name: halligalli-observability
+description: Disposable four-component observability stack for an AKS Validation Run
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

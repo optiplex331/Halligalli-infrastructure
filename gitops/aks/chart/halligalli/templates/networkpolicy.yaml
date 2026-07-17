@@ -1,0 +1,136 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: halligalli-default-deny
+  labels:
+    {{- include "halligalli.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: halligalli
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: halligalli-web
+  labels:
+    {{- include "halligalli.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "halligalli.selectorLabels" (dict "component" "web") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "halligalli.selectorLabels" (dict "component" "api") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 8000
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: halligalli-api
+  labels:
+    {{- include "halligalli.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "halligalli.selectorLabels" (dict "component" "api") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "halligalli.selectorLabels" (dict "component" "web") | nindent 14 }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: halligalli-observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: prometheus
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "halligalli.selectorLabels" (dict "component" "redis") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: halligalli-observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: collector
+      ports:
+        - protocol: TCP
+          port: 4318
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: halligalli-redis
+  labels:
+    {{- include "halligalli.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "halligalli.selectorLabels" (dict "component" "redis") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "halligalli.selectorLabels" (dict "component" "api") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 6379

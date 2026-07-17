@@ -1,0 +1,11 @@
+# Public example only. Real values are generated locally from ignored
+# AKS Validation Run values after explicit local approval.
+
+domain_name       = "halligalli.games"
+ingress_subdomain = "play"
+
+resource_group_name      = "halligalli-boss-practice-aks-rg"
+aks_cluster_name         = "halligalli-aks"
+node_resource_group_name = "halligalli-aks-nodes-rg"
+dns_prefix               = "halligalli-aks"
+kubernetes_version       = null

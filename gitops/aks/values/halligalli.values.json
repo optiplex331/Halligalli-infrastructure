@@ -1,0 +1,20 @@
+{
+  "webImage": {
+    "repository": "ghcr.io/optiplex331/halligalli-bossyang-web",
+    "digest": "sha256:66aa63c8067c96cf966165807fbd65f2ce47d9ef94a36f8a8a88040631e9bf30"
+  },
+  "apiImage": {
+    "repository": "ghcr.io/optiplex331/halligalli-bossyang-api",
+    "digest": "sha256:3b526dca2be34c9f6cf0c803f1d14f506ef5a412a3b3e834e29b36cfad05ee09"
+  },
+  "redisImage": {
+    "repository": "redis",
+    "digest": "sha256:62b5498c91778f738f0efbf0a6fd5b434011235a3e7b5f2ed4a2c0c63bb1c786"
+  },
+  "releaseVersion": "0.7.2",
+  "redisSecretName": "halligalli-redis-auth",
+  "ingress": {
+    "host": "proof.invalid",
+    "tlsSecretName": "halligalli-proof-tls"
+  }
+}

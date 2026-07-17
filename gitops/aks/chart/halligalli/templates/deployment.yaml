@@ -1,0 +1,193 @@
+{{- include "halligalli.validateValues" . -}}
+{{- $root := . -}}
+{{- range $component := list "web" "api" }}
+{{- $image := ternary $root.Values.webImage $root.Values.apiImage (eq $component "web") }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: halligalli-{{ $component }}
+  labels:
+    {{- include "halligalli.labels" $root | nindent 4 }}
+    {{- include "halligalli.selectorLabels" (dict "component" $component) | nindent 4 }}
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "halligalli.selectorLabels" (dict "component" $component) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "halligalli.selectorLabels" (dict "component" $component) | nindent 8 }}
+    spec:
+      serviceAccountName: halligalli-{{ $component }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "halligalli.selectorLabels" (dict "component" $component) | nindent 14 }}
+      containers:
+        - name: {{ $component }}
+          image: {{ include "halligalli.image" $image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ ternary 8080 8000 (eq $component "web") }}
+          env:
+          {{- if eq $component "web" }}
+            - name: HALLIGALLI_API_ORIGIN
+              value: "http://halligalli-api"
+          {{- end }}
+          {{- if eq $component "api" }}
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              value: "http://halligalli-observability-collector.halligalli-observability.svc.cluster.local:4318/v1/traces"
+          {{- end }}
+          {{- if eq $component "api" }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - >-
+              REDIS_USERNAME="$(cat /redis-auth/username)";
+              REDIS_PASSWORD="$(cat /redis-auth/password)";
+              export HALLIGALLI_REDIS_URL="redis://${REDIS_USERNAME}:${REDIS_PASSWORD}@halligalli-redis:6379/0";
+              exec uvicorn halligalli_api.app:app --host 0.0.0.0 --port 8000 --workers 1
+          {{- end }}
+          {{- if eq $component "web" }}
+          volumeMounts:
+            - name: nginx-generated-config
+              mountPath: /etc/nginx/conf.d
+            - name: nginx-tmp
+              mountPath: /tmp
+          {{- else }}
+          volumeMounts:
+            - name: redis-auth
+              mountPath: /redis-auth
+              readOnly: true
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: {{ ternary "/" "/internal/ready" (eq $component "web") }}
+              port: http
+          livenessProbe:
+            httpGet:
+              path: {{ ternary "/" "/internal/ready" (eq $component "web") }}
+              port: http
+          resources:
+            requests:
+              cpu: {{ ternary "50m" "100m" (eq $component "web") }}
+              memory: {{ ternary "64Mi" "128Mi" (eq $component "web") }}
+            limits:
+              cpu: {{ ternary "250m" "500m" (eq $component "web") }}
+              memory: {{ ternary "128Mi" "256Mi" (eq $component "web") }}
+      {{- if eq $component "web" }}
+      volumes:
+        - name: nginx-generated-config
+          emptyDir: {}
+        - name: nginx-tmp
+          emptyDir: {}
+      {{- else }}
+      volumes:
+        - name: redis-auth
+          secret:
+            secretName: {{ $root.Values.redisSecretName | quote }}
+      {{- end }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: halligalli-redis
+  labels:
+    {{- include "halligalli.labels" . | nindent 4 }}
+    {{- include "halligalli.selectorLabels" (dict "component" "redis") | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "halligalli.selectorLabels" (dict "component" "redis") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "halligalli.selectorLabels" (dict "component" "redis") | nindent 8 }}
+    spec:
+      serviceAccountName: halligalli-redis
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: redis
+          image: {{ include "halligalli.image" .Values.redisImage | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args: ["exec redis-server --save '' --appendonly no --aclfile /etc/redis/users.acl"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: redis
+              containerPort: 6379
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: redis-acl
+              mountPath: /etc/redis
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+      initContainers:
+        - name: render-acl
+          image: {{ include "halligalli.image" .Values.redisImage | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - >-
+              username="$(cat /redis-auth/username)";
+              password="$(cat /redis-auth/password)";
+              printf '%s\n%s\n' "user default off" "user ${username} on >${password} ~halligalli:room:* ~halligalli:entry:* &halligalli:room:*:snapshots +ping +hello +client|setinfo +get +set +hget +hset +expire +watch +unwatch +multi +exec +discard +publish +psubscribe +punsubscribe +scan" > /redis-acl/users.acl
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: redis-auth
+              mountPath: /redis-auth
+              readOnly: true
+            - name: redis-acl
+              mountPath: /redis-acl
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: redis-auth
+          secret:
+            secretName: {{ .Values.redisSecretName | quote }}
+        - name: redis-acl
+          emptyDir: {}

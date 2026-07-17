@@ -1,0 +1,15 @@
+# The paired runtime accepts only release selection and operation-time ingress inputs.
+webImage:
+  repository: ghcr.io/optiplex331/halligalli-bossyang-web
+  digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+apiImage:
+  repository: ghcr.io/optiplex331/halligalli-bossyang-api
+  digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+redisImage:
+  repository: redis
+  digest: "sha256:62b5498c91778f738f0efbf0a6fd5b434011235a3e7b5f2ed4a2c0c63bb1c786"
+releaseVersion: "0.0.0-placeholder"
+redisSecretName: halligalli-redis-auth
+ingress:
+  host: proof.invalid
+  tlsSecretName: halligalli-proof-tls

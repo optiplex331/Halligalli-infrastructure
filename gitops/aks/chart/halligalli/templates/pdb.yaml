@@ -1,0 +1,14 @@
+{{- range $component := list "web" "api" }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: halligalli-{{ $component }}
+  labels:
+    {{- include "halligalli.labels" $ | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "halligalli.selectorLabels" (dict "component" $component) | nindent 6 }}
+---
+{{- end }}

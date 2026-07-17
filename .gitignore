@@ -1,0 +1,32 @@
+**/.DS_Store
+
+# Terraform local/runtime files
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Generated private config
+.local/
+backend.hcl
+terraform.auto.tfvars.json
+
+# Local environment files
+.env
+.env.*
+terraform/aks/local-operation.env
+
+# Operator evidence is local by default. Only reviewed, deliberately sanitized
+# summaries and the public record template may be committed.
+evidence/*
+!evidence/README.md
+!evidence/aks-validation-summary.json
+!evidence/aks-portfolio-proof-record.template.json

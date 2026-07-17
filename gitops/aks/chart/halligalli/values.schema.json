@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["webImage", "apiImage", "redisImage", "releaseVersion", "redisSecretName", "ingress"],
+  "properties": {
+    "webImage": {"$ref": "#/definitions/image"},
+    "apiImage": {"$ref": "#/definitions/image"},
+    "redisImage": {"$ref": "#/definitions/image"},
+    "releaseVersion": {"type": "string", "minLength": 1},
+    "redisSecretName": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+    "ingress": {
+      "type": "object", "additionalProperties": false,
+      "required": ["host", "tlsSecretName"],
+      "properties": {
+        "host": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"},
+        "tlsSecretName": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"}
+      }
+    }
+  },
+  "definitions": {
+    "image": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "digest"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

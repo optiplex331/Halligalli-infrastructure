@@ -1,0 +1,391 @@
+{{- $root := . -}}
+{{- range $component := list "prometheus" "grafana" "collector" "tempo" }}
+{{- $image := index $root.Values (printf "%sImage" $component) }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: halligalli-observability-{{ $component }}
+  labels:
+    {{- include "halligalli-observability.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: halligalli-observability-{{ $component }}
+  labels:
+    {{- include "halligalli-observability.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: halligalli-observability
+    app.kubernetes.io/component: {{ $component }}
+  ports:
+    - name: http
+      port: {{ if eq $component "collector" }}4318{{ else if eq $component "tempo" }}3200{{ else if eq $component "prometheus" }}9090{{ else }}3000{{ end }}
+      targetPort: http
+    {{- if eq $component "tempo" }}
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
+    {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: halligalli-observability-{{ $component }}
+  labels:
+    {{- include "halligalli-observability.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: halligalli-observability
+      app.kubernetes.io/component: {{ $component }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: halligalli-observability
+        app.kubernetes.io/component: {{ $component }}
+    spec:
+      serviceAccountName: halligalli-observability-{{ $component }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        {{- if eq $component "prometheus" }}
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        {{- end }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: {{ $component }}
+          image: {{ include "halligalli-observability.image" $image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ if eq $component "collector" }}4318{{ else if eq $component "tempo" }}3200{{ else if eq $component "prometheus" }}9090{{ else }}3000{{ end }}
+            {{- if eq $component "tempo" }}
+            - name: otlp-http
+              containerPort: 4318
+            {{- end }}
+          {{- if eq $component "prometheus" }}
+          args: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=4h"]
+          {{- else if eq $component "grafana" }}
+          env:
+            - name: GF_PATHS_DATA
+              value: /var/lib/grafana
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+          {{- else if eq $component "collector" }}
+          args: ["--config=/etc/otelcol/config.yaml"]
+          {{- else }}
+          args: ["-config.file=/etc/tempo/config.yaml"]
+          {{- end }}
+          resources:
+            requests:
+              cpu: {{ if eq $component "prometheus" }}100m{{ else if eq $component "tempo" }}100m{{ else }}50m{{ end }}
+              memory: {{ if eq $component "prometheus" }}256Mi{{ else if eq $component "tempo" }}256Mi{{ else }}128Mi{{ end }}
+            limits:
+              cpu: {{ if eq $component "prometheus" }}250m{{ else if eq $component "tempo" }}250m{{ else if eq $component "grafana" }}200m{{ else }}250m{{ end }}
+              memory: {{ if eq $component "prometheus" }}512Mi{{ else if eq $component "tempo" }}512Mi{{ else }}256Mi{{ end }}
+          volumeMounts:
+            {{- if eq $component "grafana" }}
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+              readOnly: true
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+              readOnly: true
+            - name: dashboard
+              mountPath: /etc/grafana/dashboards
+              readOnly: true
+            {{- else }}
+            - name: config
+              mountPath: /etc/{{ if eq $component "collector" }}otelcol{{ else }}{{ $component }}{{ end }}
+              readOnly: true
+            {{- end }}
+            {{- if eq $component "prometheus" }}
+            - name: data
+              mountPath: /prometheus
+            {{- else if eq $component "grafana" }}
+            - name: data
+              mountPath: /var/lib/grafana
+            {{- else if eq $component "tempo" }}
+            - name: data
+              mountPath: /var/tempo
+            {{- end }}
+      volumes:
+        {{- if eq $component "grafana" }}
+        - name: datasources
+          configMap:
+            name: halligalli-observability-grafana-datasources
+        - name: dashboard-provider
+          configMap:
+            name: halligalli-observability-grafana-dashboard-provider
+        - name: dashboard
+          configMap:
+            name: halligalli-observability-grafana-dashboard
+        {{- else }}
+        - name: config
+          configMap:
+            name: halligalli-observability-{{ $component }}
+        {{- end }}
+        {{- if or (eq $component "prometheus") (eq $component "grafana") (eq $component "tempo") }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: halligalli-observability-prometheus
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+    scrape_configs:
+      - job_name: halligalli-api
+        metrics_path: /internal/metrics
+        static_configs:
+          - targets: ['halligalli-api.halligalli.svc.cluster.local:8000']
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: halligalli-observability-grafana-datasources
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://halligalli-observability-prometheus:9090
+        isDefault: true
+      - name: Tempo
+        type: tempo
+        url: http://halligalli-observability-tempo:3200
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: halligalli-observability-grafana-dashboard-provider
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: Halligalli
+        folder: Halligalli
+        options:
+          path: /etc/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: halligalli-observability-grafana-dashboard
+data:
+  halligalli.json: |
+    {"title":"Halligalli proof","panels":[{"title":"HTTP outcomes","type":"timeseries","targets":[{"expr":"sum(rate(halligalli_http_requests_total[5m])) by (outcome)"}]},{"title":"Active rooms","type":"stat","targets":[{"expr":"halligalli_active_rooms"}]},{"title":"Traces","type":"traces","datasource":"Tempo"}]}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: halligalli-observability-collector
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          http:
+            endpoint: 0.0.0.0:4318
+    exporters:
+      otlphttp/tempo:
+        endpoint: http://halligalli-observability-tempo:4318
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          exporters: [otlphttp/tempo]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: halligalli-observability-tempo
+data:
+  config.yaml: |
+    server:
+      http_listen_port: 3200
+    distributor:
+      receivers:
+        otlp:
+          protocols:
+            http:
+    storage:
+      trace:
+        backend: local
+        local:
+          path: /var/tempo/traces
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: halligalli-observability-default-deny
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: halligalli-observability-prometheus-flow
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: prometheus
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: grafana
+      ports:
+        - protocol: TCP
+          port: 9090
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: halligalli
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: halligalli
+              app.kubernetes.io/component: api
+      ports:
+        - protocol: TCP
+          port: 8000
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: halligalli-observability-grafana-flow
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: grafana
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: tempo
+      ports:
+        - protocol: TCP
+          port: 3200
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: halligalli-observability-collector-flow
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: collector
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: halligalli
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: halligalli
+              app.kubernetes.io/component: api
+      ports:
+        - protocol: TCP
+          port: 4318
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: tempo
+      ports:
+        - protocol: TCP
+          port: 4318
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: halligalli-observability-tempo-flow
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: tempo
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: grafana
+      ports:
+        - protocol: TCP
+          port: 3200
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: collector
+      ports:
+        - protocol: TCP
+          port: 4318

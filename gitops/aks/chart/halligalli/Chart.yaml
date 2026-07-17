@@ -1,0 +1,16 @@
+apiVersion: v2
+name: halligalli
+description: Halligalli paired Web, FastAPI, and ephemeral Redis runtime for the AKS Deployment Target.
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
+keywords:
+  - halligalli
+  - fastapi
+  - redis
+  - kubernetes
+home: https://play.halligalli.games
+sources:
+  - https://github.com/optiplex331/Halligalli-BossYang
+maintainers:
+  - name: Halligalli maintainers
