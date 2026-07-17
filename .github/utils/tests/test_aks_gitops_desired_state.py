@@ -13,14 +13,18 @@ VALUES_PATH = GITOPS_ROOT / "values" / "halligalli.values.json"
 CHART_PATH = GITOPS_ROOT / "chart" / "halligalli"
 
 
+def render_chart() -> str:
+    return subprocess.run(
+        ["helm", "template", "halligalli", str(CHART_PATH), "--values", str(VALUES_PATH)],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+
 class AksRenderedBoundaryTest(unittest.TestCase):
     def test_rendered_runtime_enforces_security_and_network_boundaries(self) -> None:
-        rendered = subprocess.run(
-            ["helm", "template", "halligalli", str(CHART_PATH), "--values", str(VALUES_PATH)],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
+        rendered = render_chart()
 
         self.assertEqual(rendered.count("kind: NetworkPolicy\n"), 4)
         self.assertIn("name: halligalli-default-deny", rendered)
@@ -33,12 +37,7 @@ class AksRenderedBoundaryTest(unittest.TestCase):
         self.assertIn("k8s-app: kube-dns", rendered)
 
     def test_redis_secret_operation_is_approval_gated_and_does_not_render_a_credential(self) -> None:
-        rendered = subprocess.run(
-            ["helm", "template", "halligalli", str(CHART_PATH), "--values", str(VALUES_PATH)],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
+        rendered = render_chart()
         blocked = subprocess.run(
             ["sh", str(GITOPS_ROOT / "scripts" / "apply-redis-auth-secret.sh")],
             capture_output=True,
