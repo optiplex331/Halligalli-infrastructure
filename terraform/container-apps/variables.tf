@@ -19,18 +19,6 @@ variable "container_app_name" {
   default = "halligalli-live-demo"
 }
 
-variable "custom_domain_name" {
-  type    = string
-  default = "play.halligalli.games"
-}
-
-variable "environment_certificate_id" {
-  type        = string
-  default     = null
-  nullable    = true
-  description = "Existing Container Apps environment certificate; null only during the initial custom-domain bootstrap."
-}
-
 variable "monthly_budget_target_usd" {
   type        = number
   default     = 25

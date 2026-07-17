@@ -48,17 +48,20 @@ class ContainerAppsContractTest(unittest.TestCase):
         with self.assertRaises(ContainerAppsRevisionError):
             validate_desired_state(self.state)
 
-    def test_terraform_and_workflows_preserve_rollout_boundary(self) -> None:
+    def test_terraform_and_operator_script_preserve_rollout_boundary(self) -> None:
         terraform = "\n".join(path.read_text() for path in (REPO_ROOT / "terraform/container-apps").glob("*.tf"))
-        deploy = (REPO_ROOT / ".github/workflows/deploy-container-apps.yml").read_text()
+        deploy = (REPO_ROOT / "scripts/deploy-container-apps.sh").read_text()
         monitor = (REPO_ROOT / ".github/workflows/monitor-live-demo.yml").read_text()
         for expected in ("azurerm_container_app", 'external_enabled = true', 'target_port      = 8080', 'revision_mode                = "Multiple"', 'revision_suffix = "bootstrap"', "ignore_changes"):
             self.assertIn(expected, terraform)
         self.assertNotIn("latest_revision = true", terraform)
         self.assertIn('default     = 25', terraform)
         self.assertIn('var.monthly_budget_target_usd == 25', terraform)
-        for expected in ("environment: container-apps", "candidate-revision.json", "internal/identity", "websocket", "ingress traffic set", "previous_revision", "repair"):
+        for expected in ("az account show", "candidate-revision.json", "internal/identity", "websocket", "ingress traffic set", "previous_revision", "restored"):
             self.assertIn(expected, deploy.lower())
+        for prohibited in ("azure/login", "azure_credentials", "service principal", "publish profile"):
+            self.assertNotIn(prohibited, deploy.lower())
+        self.assertFalse((REPO_ROOT / ".github/workflows/deploy-container-apps.yml").exists())
         self.assertIn("external_monitor.py", monitor)
 
 
