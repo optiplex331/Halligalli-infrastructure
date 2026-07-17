@@ -1,5 +1,4 @@
 """Static contract tests for paired, Infrastructure-owned Draft promotion."""
-import re
 import unittest
 from pathlib import Path
 
@@ -21,8 +20,8 @@ class ReleasePromotionWorkflowTest(unittest.TestCase):
             "http://localhost:18000/internal/ready",
             "http://localhost:18080/",
             "python3 -m unittest discover",
-            "gh pr create",
-            "--draft",
+            "peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1",
+            "draft: always-true",
         ):
             self.assertIn(expected, workflow)
         for prohibited in (
@@ -38,8 +37,8 @@ class ReleasePromotionWorkflowTest(unittest.TestCase):
         for expected in ("contents: write", "pull-requests: write", "attestations: read"):
             self.assertIn(expected, workflow)
         self.assertIn("GH_TOKEN: ${{ github.token }}", workflow)
-        self.assertRegex(workflow, re.compile(r"gh pr create[^\n]+--draft"))
-        for prohibited in ("gh pr merge", "argocd app sync"):
+        self.assertIn("draft: always-true", workflow)
+        for prohibited in ("gh pr create", "gh pr edit", "gh pr merge", "argocd app sync"):
             self.assertNotIn(prohibited, workflow)
 
     def test_keeps_aks_promotion_lane_and_one_values_file_scope(self) -> None:
@@ -47,7 +46,7 @@ class ReleasePromotionWorkflowTest(unittest.TestCase):
         self.assertIn("group: aks-release-promotion", workflow)
         self.assertIn("cancel-in-progress: false", workflow)
         self.assertIn("VALUES_PATH: gitops/aks/values/halligalli.values.json", workflow)
-        self.assertIn('git add "${VALUES_PATH}"', workflow)
+        self.assertIn("add-paths: ${{ env.VALUES_PATH }}", workflow)
         self.assertIn("Promotion may change only ${VALUES_PATH}", workflow)
 
     def test_container_apps_has_an_independent_target_scoped_lane(self) -> None:
@@ -58,9 +57,12 @@ class ReleasePromotionWorkflowTest(unittest.TestCase):
         self.assertIn("Paired Release Manifest", workflow)
         self.assertIn("Verify Web artifact provenance", workflow)
         self.assertIn("Verify API artifact provenance", workflow)
-        self.assertEqual(workflow.count("GH_TOKEN: ${{ github.token }}"), 4)
-        self.assertIn("inspect-pr --input open-promotion-prs.json", workflow)
-        self.assertIn("--draft", workflow)
+        self.assertEqual(workflow.count("GH_TOKEN: ${{ github.token }}"), 2)
+        self.assertIn("token: ${{ github.token }}", workflow)
+        self.assertIn("add-paths: ${{ env.DESIRED_STATE_PATH }}", workflow)
+        self.assertIn("draft: always-true", workflow)
+        self.assertNotIn("inspect-pr --input open-promotion-prs.json", workflow)
+        self.assertNotIn("gh pr create", workflow)
         self.assertNotIn("gitops/aks", workflow)
         self.assertNotIn("terraform apply", workflow)
 
