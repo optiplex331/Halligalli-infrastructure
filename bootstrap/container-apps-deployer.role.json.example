@@ -1,0 +1,21 @@
+{
+  "Name": "Halligalli Container Apps Deployer",
+  "IsCustom": true,
+  "Description": "Deploy and roll back Halligalli Container App revisions without deleting apps or reading secrets.",
+  "Actions": [
+    "Microsoft.Resources/subscriptions/resourceGroups/read",
+    "Microsoft.App/containerApps/read",
+    "Microsoft.App/containerApps/write",
+    "Microsoft.App/containerApps/revisions/read",
+    "Microsoft.App/containerApps/revisions/deactivate/action",
+    "Microsoft.App/managedEnvironments/read",
+    "Microsoft.App/locations/containerappoperationstatuses/read",
+    "Microsoft.App/locations/containerappoperationresults/read"
+  ],
+  "NotActions": [],
+  "DataActions": [],
+  "NotDataActions": [],
+  "AssignableScopes": [
+    "/subscriptions/replace/resourceGroups/halligalli-container-apps"
+  ]
+}

@@ -1,0 +1,5 @@
+resource_group_name  = "halligalli-terraform-state"
+storage_account_name = "replace-with-bootstrap-storage-account"
+container_name       = "tfstate"
+key                  = "container-apps.tfstate"
+use_azuread_auth     = true
