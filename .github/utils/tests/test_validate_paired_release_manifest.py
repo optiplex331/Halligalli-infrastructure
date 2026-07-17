@@ -50,6 +50,15 @@ class PairedReleaseManifestTest(unittest.TestCase):
         with self.assertRaisesRegex(PairedReleaseManifestError, "requested release tag"):
             validate_release_evidence(manifest(), expected_tag="v1.2.4")
 
+    def test_rejects_mixed_mutable_or_inconsistent_release_evidence(self) -> None:
+        cases = []
+        mixed = manifest(); mixed["images"]["api"]["tag"] = "1.2.4"; cases.append(mixed)
+        mutable = manifest(); mutable["images"]["web"]["digest"] = "latest"; cases.append(mutable)
+        inconsistent = manifest(); inconsistent["runtimeIdentity"]["commit"] = "d" * 40; cases.append(inconsistent)
+        for candidate in cases:
+            with self.subTest(candidate=candidate), self.assertRaises(PairedReleaseManifestError):
+                validate_paired_release_manifest(candidate)
+
     def test_promotes_only_paired_images_version_and_commit(self) -> None:
         values = {"webImage": {"repository": "old-web", "digest": "sha256:" + "0" * 64}, "apiImage": {"repository": "old-api", "digest": "sha256:" + "1" * 64}, "releaseVersion": "old", "releaseCommit": "0" * 40, "redisImage": {"repository": "redis"}}
         original = copy.deepcopy(values)
