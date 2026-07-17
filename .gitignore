@@ -1,4 +1,4 @@
-.DS_Store
+**/.DS_Store
 
 # Terraform local/runtime files
 **/.terraform/
