@@ -34,7 +34,7 @@ export HALLIGALLI_AKS_KUBERNETES_VERSION="1.XX.Y"
 # The helper downloads and verifies this published schema-V2 release asset,
 # resolves its Product tag commit, and compares both digests with GitOps values.
 export HALLIGALLI_AKS_PROOF_RELEASE_TAG="vX.Y.Z"
-export HALLIGALLI_AKS_PROOF_PRODUCT_REPOSITORY="optiplex331/Halligalli"
+export HALLIGALLI_AKS_PROOF_PRODUCT_REPOSITORY="optiplex331/Halligalli-BossYang"
 python3 .github/utils/write_aks_terraform_config.py
 
 HALLIGALLI_OPERATION_APPROVED=1 \

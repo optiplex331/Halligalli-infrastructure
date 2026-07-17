@@ -52,6 +52,11 @@ class RepositoryRetirementTest(unittest.TestCase):
                 f"active documentation references the retired Terraform root: {active_document}",
             )
 
+        self.assertNotIn(
+            "terraform/azure-kubernetes-production/",
+            (REPO_ROOT / ".gitignore").read_text(encoding="utf-8"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

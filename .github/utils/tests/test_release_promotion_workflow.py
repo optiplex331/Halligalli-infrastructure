@@ -37,6 +37,7 @@ class ReleasePromotionWorkflowTest(unittest.TestCase):
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
         for expected in ("contents: write", "pull-requests: write", "attestations: read"):
             self.assertIn(expected, workflow)
+        self.assertIn("GH_TOKEN: ${{ github.token }}", workflow)
         self.assertRegex(workflow, re.compile(r"gh pr create[^\n]+--draft"))
         for prohibited in ("gh pr merge", "argocd app sync"):
             self.assertNotIn(prohibited, workflow)
@@ -57,7 +58,8 @@ class ReleasePromotionWorkflowTest(unittest.TestCase):
         self.assertIn("Paired Release Manifest", workflow)
         self.assertIn("Verify Web artifact provenance", workflow)
         self.assertIn("Verify API artifact provenance", workflow)
-        self.assertEqual(workflow.count("GH_TOKEN: ${{ github.token }}"), 3)
+        self.assertEqual(workflow.count("GH_TOKEN: ${{ github.token }}"), 4)
+        self.assertIn("inspect-pr --input open-promotion-prs.json", workflow)
         self.assertIn("--draft", workflow)
         self.assertNotIn("gitops/aks", workflow)
         self.assertNotIn("terraform apply", workflow)

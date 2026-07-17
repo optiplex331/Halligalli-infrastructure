@@ -69,11 +69,18 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore(container-apps): promote Halligalli ${RELEASE_TAG}"
           git push --force-with-lease origin "HEAD:refs/heads/${PROMOTION_BRANCH}"
+      - name: Validate existing promotion PR state
+        id: existing_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr list --base main --head "${PROMOTION_BRANCH}" --state open --limit 2 --json number,state,isDraft,url > open-promotion-prs.json
+          python3 .github/utils/prepare_release_promotion.py inspect-pr --input open-promotion-prs.json
       - name: Create or update Draft target promotion PR
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           title="chore(container-apps): promote Halligalli ${RELEASE_TAG}"
           body="Target Promotion for the container-apps Live Demo Environment. This Draft changes only ${DESIRED_STATE_PATH}; it does not modify AKS desired state or deploy to Azure."
-          number="$(gh pr list --base main --head "${PROMOTION_BRANCH}" --state open --json number --jq '.[0].number // empty')"
+          number="${{ steps.existing_pr.outputs.number }}"
           if test -n "${number}"; then gh pr edit "${number}" --title "${title}" --body "${body}"; else gh pr create --base main --head "${PROMOTION_BRANCH}" --title "${title}" --body "${body}" --draft; fi

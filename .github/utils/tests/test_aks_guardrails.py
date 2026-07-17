@@ -15,14 +15,8 @@ def terraform_source() -> str:
 
 
 class AksGuardrailsTest(unittest.TestCase):
-    def test_moves_only_the_renamed_resource_addresses(self) -> None:
-        moved = (TERRAFORM_ROOT / "moved.tf").read_text(encoding="utf-8")
-
-        self.assertEqual(moved.count("moved {"), 2)
-        self.assertIn("from = azurerm_resource_group.production", moved)
-        self.assertIn("to   = azurerm_resource_group.aks", moved)
-        self.assertIn("from = azurerm_kubernetes_cluster.production", moved)
-        self.assertIn("to   = azurerm_kubernetes_cluster.aks", moved)
+    def test_clean_snapshot_has_no_legacy_state_moves(self) -> None:
+        self.assertFalse((TERRAFORM_ROOT / "moved.tf").exists())
 
     def test_locks_the_two_node_base_free_pool_shape(self) -> None:
         aks = (TERRAFORM_ROOT / "aks.tf").read_text(encoding="utf-8")

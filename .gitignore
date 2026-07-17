@@ -23,7 +23,6 @@ terraform.auto.tfvars.json
 .env
 .env.*
 terraform/aks/local-operation.env
-terraform/azure-kubernetes-production/local-operation.env
 
 # Operator evidence is local by default. Only reviewed, deliberately sanitized
 # summaries and the public record template may be committed.

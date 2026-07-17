@@ -23,6 +23,7 @@ jobs:
     name: Validate paired release and draft proof promotion
     runs-on: ubuntu-24.04
     env:
+      GH_TOKEN: ${{ github.token }}
       PRODUCT_REPOSITORY: optiplex331/Halligalli-BossYang
       VALUES_PATH: gitops/aks/values/halligalli.values.json
       CANDIDATE_NETWORK: halligalli-promotion-${{ github.run_id }}-${{ github.run_attempt }}
