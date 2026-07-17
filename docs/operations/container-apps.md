@@ -16,6 +16,21 @@ The initial app total is 0.5 vCPU / 1 GiB with `minReplicas = 1` and `maxReplica
 
 Terraform binds `play.halligalli.games` to an existing Container Apps environment certificate. Creating the certificate and DNS validation records is a separately approved bootstrap operation; this repository does not hide either behind the deployment workflow.
 
+## Bootstrap order
+
+Bootstrap uses Azure AD authentication and remote Terraform state. Create the
+state resource group, storage account, and private `tfstate` container first,
+then copy `terraform/container-apps/backend.hcl.example` to the ignored
+`backend.hcl` and initialize with `terraform init -backend-config=backend.hcl`.
+
+Because the managed certificate validates an existing app hostname, apply the
+resource group and environment targets first, then run a complete apply with
+`environment_certificate_id = null` to create the bootstrap app. Point the
+custom-domain DNS record at the app FQDN, add the hostname, and create the
+managed certificate. A final complete apply with the certificate resource ID
+binds TLS. Keep the backend config and `terraform.tfvars` local; neither
+contains application secrets, but both identify the Azure account.
+
 ## Promotion and deployment
 
 Run `Target Promotion - Container Apps` manually with a formal Release Tag. It downloads `paired-release-manifest.json`, verifies the tag/commit/Web/API binding and GitHub provenance for each digest, and creates or updates a Draft PR changing only `deployment/container-apps/desired-state.json`. Development Images are rejected by construction.
@@ -25,7 +40,13 @@ The checked-in `v0.7.2` values are a non-deployable historical bootstrap referen
 After merge to `main`, `Deploy Container Apps Live Demo` first validates that desired state is deployable, then uses the protected GitHub Environment `container-apps`. That Environment requires owner review and protected-branch deployment. It must contain:
 
 - secret `AZURE_CREDENTIALS`: service-principal JSON containing a client secret;
-- a principal with only the permissions needed to update and inspect the Container App inside resource group `halligalli-container-apps` (resource-group scope, not subscription scope).
+- a principal assigned the custom role in
+  `bootstrap/container-apps-deployer.role.json.example` at resource group
+  `halligalli-container-apps` (resource-group scope, not subscription scope).
+
+The custom role can update the app, inspect revisions, and deactivate a failed
+candidate. It cannot delete the app, read application secrets, or open an exec
+session.
 
 The Environment is repository configuration; credential values are never stored in Git.
 

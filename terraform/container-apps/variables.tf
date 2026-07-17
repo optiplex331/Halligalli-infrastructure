@@ -1,6 +1,12 @@
 variable "location" {
   type    = string
-  default = "westeurope"
+  default = "northeurope"
+}
+
+variable "resource_group_location" {
+  type        = string
+  default     = "westeurope"
+  description = "Metadata location for the existing resource group; runtime capacity is selected by location."
 }
 
 variable "resource_group_name" {
@@ -20,7 +26,9 @@ variable "custom_domain_name" {
 
 variable "environment_certificate_id" {
   type        = string
-  description = "Existing Container Apps environment certificate for the approved custom domain."
+  default     = null
+  nullable    = true
+  description = "Existing Container Apps environment certificate; null only during the initial custom-domain bootstrap."
 }
 
 variable "monthly_budget_target_usd" {

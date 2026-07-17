@@ -1,11 +1,11 @@
 resource "azurerm_resource_group" "live_demo" {
   name     = var.resource_group_name
-  location = var.location
+  location = var.resource_group_location
 }
 
 resource "azurerm_container_app_environment" "live_demo" {
   name                = "halligalli-live-demo"
-  location            = azurerm_resource_group.live_demo.location
+  location            = var.location
   resource_group_name = azurerm_resource_group.live_demo.name
 }
 
@@ -20,10 +20,14 @@ resource "azurerm_container_app" "live_demo" {
     target_port      = 8080
     transport        = "auto"
 
-    custom_domain {
-      name                     = var.custom_domain_name
-      certificate_binding_type = "SniEnabled"
-      certificate_id           = var.environment_certificate_id
+    dynamic "custom_domain" {
+      for_each = var.environment_certificate_id == null ? [] : [var.environment_certificate_id]
+
+      content {
+        name                     = var.custom_domain_name
+        certificate_binding_type = "SniEnabled"
+        certificate_id           = custom_domain.value
+      }
     }
 
     traffic_weight {
@@ -64,7 +68,7 @@ resource "azurerm_container_app" "live_demo" {
       image   = var.redis_image
       cpu     = 0.12
       memory  = "0.25Gi"
-      command = ["redis-server", "--save", "", "--appendonly", "no"]
+      command = ["sh", "-c", "exec redis-server --save '' --appendonly no"]
     }
   }
 
