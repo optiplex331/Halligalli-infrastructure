@@ -21,7 +21,7 @@ Development Images are diagnostic only and cannot enter either formal promotion 
 - Promotion workflows verify paired Web/API digests and GitHub artifact provenance before opening target-scoped Draft PRs. They cannot merge those PRs.
 - Container Apps deployment is deliberately not executed by GitHub Actions. The operator reviews and merges desired state, signs in locally with `az login`, and runs [`scripts/deploy-container-apps.sh`](scripts/deploy-container-apps.sh).
 - No Azure credential, user refresh token, service-principal secret, or publish profile is stored in GitHub.
-- Actions are restricted to GitHub-owned and verified publishers. Every referenced action is pinned to a full commit SHA.
+- Actions are restricted to GitHub-owned and verified publishers plus explicitly allowlisted repositories. Every referenced action is pinned to a full commit SHA.
 
 ## Local validation
 
