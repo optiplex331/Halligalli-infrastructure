@@ -6,7 +6,7 @@ usage() {
   cat <<'EOF'
 Usage: orbstack-integration.sh [preflight|run]
 
-preflight (default) only checks local prerequisites and renders both closed Charts.
+preflight (default) checks local prerequisites and lints both closed Charts.
 run creates disposable resources in an OrbStack cluster after explicit approval.
 
 Environment:
@@ -16,8 +16,8 @@ Environment:
   HALLIGALLI_ORBSTACK_EVIDENCE Output evidence JSON (default: a temporary path).
   HALLIGALLI_ORBSTACK_APPROVED Must equal 1 before run can mutate Kubernetes.
 
-This helper does not prove multi-node scheduling, pod disruption, AKS networking,
-cloud DNS/TLS, Argo CD reconciliation, or Azure cost and teardown claims.
+This one-node helper does not prove multi-node scheduling, pod disruption, AKS
+networking, cloud DNS/TLS, Argo CD reconciliation, or Azure cost and teardown.
 EOF
 }
 
@@ -28,17 +28,17 @@ case "$mode" in
   *) usage >&2; exit 2 ;;
 esac
 
-script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-gitops_root="$(CDPATH= cd -- "$script_dir/.." && pwd)"
-repo_root="$(CDPATH= cd -- "$gitops_root/../.." && pwd)"
+script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+gitops_root="$(CDPATH='' cd -- "$script_dir/.." && pwd)"
+repo_root="$(CDPATH='' cd -- "$gitops_root/../.." && pwd)"
 chart_path="$gitops_root/chart/halligalli"
 observability_chart_path="$gitops_root/chart/halligalli-observability"
 default_values="$gitops_root/values/halligalli.values.json"
 observability_values="$gitops_root/values/halligalli-observability.values.json"
 values_path="${HALLIGALLI_ORBSTACK_VALUES:-$default_values}"
 host="${HALLIGALLI_ORBSTACK_HOST:-halligalli.orb.local}"
-namespace="halligalli-orbstack"
-observability_namespace="halligalli-orbstack-observability"
+namespace="halligalli"
+observability_namespace="halligalli-observability"
 tls_secret="halligalli-orbstack-tls"
 
 for command in docker kubectl helm openssl python3; do
@@ -64,31 +64,27 @@ esac
 
 [ -f "$values_path" ] || { echo "Missing HALLIGALLI_ORBSTACK_VALUES: $values_path" >&2; exit 1; }
 
-python3 - "$values_path" <<'PY'
-import json
-import re
+# Lint before any mutation. Chart schemas own the closed values contracts.
+helm lint "$chart_path" --values "$values_path" \
+  --set "ingress.host=$host" --set "ingress.tlsSecretName=$tls_secret" >/dev/null
+helm lint "$observability_chart_path" \
+  --values "$observability_values" >/dev/null
+
+# The AKS preflight validator owns shared target-wide desired-state requirements.
+redis_secret="$(PYTHONPATH="$repo_root/.github/utils" python3 - "$values_path" <<'PY'
 import sys
 from pathlib import Path
 
-values = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-required = {"webImage", "apiImage", "redisImage", "releaseVersion", "redisSecretName", "ingress"}
-if set(values) != required:
-    raise SystemExit("OrbStack values must use the AKS chart's closed values surface.")
-for key in ("webImage", "apiImage", "redisImage"):
-    if not re.fullmatch(r"sha256:[0-9a-f]{64}", values[key].get("digest", "")):
-        raise SystemExit(f"{key} must be digest-pinned.")
-if not isinstance(values["releaseVersion"], str) or not values["releaseVersion"]:
-    raise SystemExit("releaseVersion must be a non-empty display version.")
-PY
+from validate_aks_preflight import load_object, validate_desired_state
 
-# Render before any mutation. Only closed, operation-time ingress inputs change.
-helm template halligalli-orbstack "$chart_path" --values "$values_path" \
-  --set "ingress.host=$host" --set "ingress.tlsSecretName=$tls_secret" >/dev/null
-helm template halligalli-orbstack-observability "$observability_chart_path" \
-  --values "$observability_values" >/dev/null
+values = load_object(Path(sys.argv[1]))
+validate_desired_state(values)
+print(values["redisSecretName"])
+PY
+)"
 
 if [ "$mode" = "preflight" ]; then
-  printf '%s\n' "OrbStack preflight passed: both AKS target Charts render with closed values."
+  printf '%s\n' "OrbStack preflight passed: shared desired-state validation and both closed Chart schemas passed."
   printf '%s\n' "No Kubernetes, Azure, DNS, or registry operation was performed."
   exit 0
 fi
@@ -120,7 +116,7 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=$host" \
 
 kubectl create namespace "$namespace" --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace "$observability_namespace" --dry-run=client -o yaml | kubectl apply -f -
-kubectl -n "$namespace" create secret generic halligalli-redis-auth \
+kubectl -n "$namespace" create secret generic "$redis_secret" \
   --from-literal=username=halligalli-api --from-literal=password="$(openssl rand -hex 32)" \
   --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n "$namespace" create secret tls "$tls_secret" --cert="$certificate" --key="$private_key" \
@@ -136,13 +132,17 @@ for deployment in halligalli-web halligalli-api halligalli-redis; do
 done
 python3 "$repo_root/.github/utils/verify_running_pod_digests.py" \
   --values "$values_path" --namespace "$namespace" --rollout-timeout 180s
-for deployment in prometheus grafana collector tempo; do
+for deployment in prometheus collector tempo; do
   kubectl -n "$observability_namespace" rollout status "deployment/halligalli-observability-$deployment" --timeout=180s
 done
 
+kubectl -n "$namespace" get ingress halligalli >/dev/null
+kubectl -n "$namespace" get secret "$redis_secret" "$tls_secret" >/dev/null
 kubectl -n "$namespace" get networkpolicy halligalli-default-deny halligalli-web halligalli-api halligalli-redis >/dev/null
-kubectl -n "$observability_namespace" get networkpolicy halligalli-observability-default-deny >/dev/null
-kubectl -n "$observability_namespace" get endpoints halligalli-observability-prometheus halligalli-observability-grafana halligalli-observability-collector halligalli-observability-tempo >/dev/null
+kubectl -n "$observability_namespace" get networkpolicy halligalli-observability-default-deny halligalli-observability-prometheus-flow halligalli-observability-collector-flow halligalli-observability-tempo-flow >/dev/null
+kubectl -n "$observability_namespace" get endpoints halligalli-observability-prometheus halligalli-observability-collector halligalli-observability-tempo >/dev/null
+kubectl get --raw "/api/v1/namespaces/$observability_namespace/services/http:halligalli-observability-prometheus:9090/proxy/api/v1/query?query=up" >/dev/null
+kubectl get --raw "/api/v1/namespaces/$observability_namespace/services/http:halligalli-observability-tempo:3200/proxy/api/status/buildinfo" >/dev/null
 curl --fail --silent --show-error --insecure --resolve "$host:443:127.0.0.1" "https://$host/" >/dev/null
 
 evidence_path="${HALLIGALLI_ORBSTACK_EVIDENCE:-$repo_root/.local/orbstack-one-node-evidence.json}"
@@ -158,7 +158,7 @@ Path(sys.argv[1]).write_text(json.dumps({
     "recordedAt": datetime.now(timezone.utc).isoformat(),
     "context": sys.argv[2],
     "sameOriginHost": sys.argv[3],
-    "validated": ["paired runtime", "generated Redis Secret", "NetworkPolicies", "same-origin ingress", "observability deployments"],
+    "validated": ["paired runtime readiness", "selected Web/API Pod digests", "generated Secrets", "Ingress", "NetworkPolicies", "Prometheus query API", "OpenTelemetry Collector readiness", "Tempo query API"],
     "notProven": ["multi-node scheduling", "pod disruption", "AKS networking", "cloud DNS/TLS", "Argo CD reconciliation", "Azure cost and teardown"],
 }, indent=2) + "\n", encoding="utf-8")
 PY
