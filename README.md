@@ -42,5 +42,6 @@ These commands are static validation only. Never use a cloud apply as validation
 
 The only operational runbooks are [Container Apps Live Demo](docs/operations/container-apps.md)
 and [AKS Deployment Target](docs/operations/aks.md). Executable desired state owns
-current release, platform, resource, and dependency selections. Completed AKS run
-facts live only in dated files under `evidence/`.
+current release, platform, resource, and dependency selections. Future completed
+AKS run facts live only in dated files under `evidence/`; the existing
+`evidence/aks-validation-summary.json` is an immutable historical exception.
