@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "releaseTag": "v1.2.3",
+  "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "images": {
+    "web": {
+      "repository": "ghcr.io/optiplex331/halligalli-bossyang-web",
+      "tag": "1.2.3",
+      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  },
+  "runtimeIdentity": {
+    "version": "1.2.3",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

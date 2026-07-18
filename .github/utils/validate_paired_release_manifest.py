@@ -1,6 +1,5 @@
 """Validate a schema-V2 Paired Release Manifest without changing desired state."""
 
-import copy
 import argparse
 import json
 import re
@@ -50,23 +49,6 @@ def validate_release_evidence(manifest: dict[str, Any], *, expected_tag: str) ->
     if manifest.get("releaseTag") != expected_tag:
         raise PairedReleaseManifestError("manifest does not match the requested release tag")
     return candidate
-
-
-def build_promoted_values(current_values: dict[str, Any], candidate: dict[str, str]) -> dict[str, Any]:
-    promoted = copy.deepcopy(current_values)
-    if not isinstance(promoted.get("releaseVersion"), str):
-        raise PairedReleaseManifestError("desired state requires releaseVersion")
-    for role, values_key in (("web", "webImage"), ("api", "apiImage")):
-        image = promoted.get(values_key)
-        if not isinstance(image, dict):
-            raise PairedReleaseManifestError(f"desired state requires {values_key}")
-        image.update({"repository": candidate[f"{role}_repository"], "digest": candidate[f"{role}_digest"]})
-    promoted["releaseVersion"] = candidate["version"]
-    if "releaseCommit" in promoted:
-        promoted["releaseCommit"] = candidate["commit"]
-    if promoted.get("target") == "container-apps":
-        promoted["deploymentEnabled"] = True
-    return promoted
 
 
 def validate_file_to_output(manifest_path: Path, *, expected_tag: str, output_path: Path) -> dict[str, str]:
