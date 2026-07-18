@@ -11,7 +11,7 @@ This repository owns Terraform, target-specific Deployment Desired State, indepe
 | Target | Current role | Delivery model |
 |---|---|---|
 | `container-apps` | Continuously available Live Demo at `play.halligalli.games` | PR-gated desired state with an explicitly approved local Terraform apply |
-| `aks` | Maintained deployment-capable target; last verified baseline `v0.7.2` | Target-scoped promotion and Argo CD GitOps reconciliation during approved validation runs |
+| `aks` | Maintained deployment-capable target | Target-scoped promotion and Argo CD GitOps reconciliation during approved validation runs |
 
 Development Images are diagnostic only and cannot enter either formal promotion lane. One promotion changes exactly one target's desired-state file.
 
@@ -40,4 +40,7 @@ helm lint gitops/aks/chart/halligalli-observability --values gitops/aks/values/h
 
 These commands are static validation only. Never use a cloud apply as validation.
 
-See [Container Apps Live Demo](docs/operations/container-apps.md), [AKS Target](docs/operations/aks.md), and [AKS Validation Procedure](docs/operations/aks-validation.md).
+The only operational runbooks are [Container Apps Live Demo](docs/operations/container-apps.md)
+and [AKS Deployment Target](docs/operations/aks.md). Executable desired state owns
+current release, platform, resource, and dependency selections. Completed AKS run
+facts live only in dated files under `evidence/`.

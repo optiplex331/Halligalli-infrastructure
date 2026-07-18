@@ -2,17 +2,14 @@
 
 `container-apps` is the target for the continuously available Live Demo Environment at `https://play.halligalli.games`. It uses PR-gated desired state plus an explicit local operator deployment, is not GitOps, and has no public API domain. Checked-in desired state and static validation do not prove that a separately approved live deployment has occurred.
 
-## Runtime and cost target
+## Runtime ownership
 
-One Azure Container App contains three separate containers sharing localhost networking:
-
-| Container | Purpose | CPU | Memory |
-|---|---|---:|---:|
-| Web | nginx public gateway on port 8080 | 0.12 vCPU | 0.25 GiB |
-| API | FastAPI on localhost:8000 | 0.26 vCPU | 0.5 GiB |
-| Redis | ephemeral Redis on localhost:6379 with persistence disabled | 0.12 vCPU | 0.25 GiB |
-
-The initial app total is 0.5 vCPU / 1 GiB with `minReplicas = 1` and `maxReplicas = 1`. The monthly budget target is USD 25. An approved ephemeral platform test on 2026-07-17 showed that Azure rejects the original `0.125 / 0.25 / 0.125` split because each container CPU value may have at most two decimal places; Azure accepted the nearest symmetric `0.12 / 0.26 / 0.12` split without changing the total.
+One Azure Container App contains separate Web, API, and ephemeral Redis
+containers sharing localhost networking. Terraform owns the exact region,
+resource names, resource allocations, scaling limits, images, ingress, and
+platform probes; do not copy those values into operator notes. The checked-in
+Deployment Desired State owns the complete release selection, and the Terraform
+root consumes it directly.
 
 Creating the DNS validation records, managed certificate, and `play.halligalli.games` binding is a separately approved bootstrap operation. AzureRM exposes the app's custom-domain collection as read-only, so this repository does not pretend that Terraform owns that binding or hide it behind deployment.
 
@@ -30,11 +27,11 @@ certificate reaches `Succeeded`, bind it explicitly:
 
 ```bash
 az containerapp hostname bind \
-  --resource-group halligalli-container-apps \
-  --name halligalli-live-demo \
+  --resource-group '<resource group from the reviewed Terraform state>' \
+  --name '<Container App from the reviewed Terraform state>' \
   --hostname play.halligalli.games \
-  --environment halligalli-live-demo \
-  --certificate play-halligalli-games
+  --environment '<Container Apps environment from the reviewed Terraform state>' \
+  --certificate '<managed certificate name>'
 ```
 
 Keep the backend config and `terraform.tfvars` local; neither contains
@@ -47,7 +44,10 @@ Deployment Desired State.
 
 Run `Target Promotion - Container Apps` manually with a formal Release Tag. It downloads `paired-release-manifest.json`, verifies the tag/commit/Web/API binding and GitHub provenance for each digest, and creates or updates a Draft PR changing only `deployment/container-apps/desired-state.json`. Development Images are rejected by construction.
 
-The checked-in `v0.7.2` values are a non-deployable historical bootstrap reference (`deploymentEnabled: false`) because that release predates the Paired Release Manifest filename. The first successful target promotion must select a formal release that publishes the renamed manifest; promotion sets `deploymentEnabled: true`. Terraform reads this checked-in file directly and rejects a disabled, cross-target, incomplete, or non-digest-pinned Web/API/Redis selection before apply. Local variable files do not select release images.
+Terraform reads the checked-in desired-state file directly and rejects a
+disabled, cross-target, incomplete, or non-digest-pinned Web/API/Redis selection
+before apply. Target Promotion owns enabling a deployable formal release. Local
+variable files do not select release images.
 
 After merge to `main`, deploy from a trusted local checkout using the operator's interactive Azure CLI session. Initialize the configured backend, save a plan, and review the exact saved plan before approving apply:
 
@@ -78,7 +78,8 @@ Single revision delivery does not retain manual traffic weights or provide an im
 ## Monitoring and readiness
 
 `Monitor Live Demo` runs a read-only public HTTPS and WebSocket uptime check
-daily at 06:17 UTC and may also be dispatched manually. Either check failing
+once daily and may also be dispatched manually. The workflow owns its exact
+schedule. Either check failing
 fails the workflow directly; the repository does not create or maintain a
 GitHub Issue incident for uptime failures.
 
