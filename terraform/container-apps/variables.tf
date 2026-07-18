@@ -29,15 +29,3 @@ variable "monthly_budget_target_usd" {
     error_message = "The initial Live Demo monthly budget target must remain USD 25 until deliberately reviewed."
   }
 }
-
-variable "web_image" {
-  type = string
-}
-
-variable "api_image" {
-  type = string
-}
-
-variable "redis_image" {
-  type = string
-}

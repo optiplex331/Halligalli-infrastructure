@@ -1,31 +1,37 @@
 resource "azurerm_resource_group" "aks" {
-  name     = local.resource_group_name
-  location = local.region
-  tags     = local.common_tags
+  name     = "halligalli-boss-practice-aks-rg"
+  location = local.aks_target.region
+  tags = {
+    Application   = "Halligalli"
+    Environment   = "aks"
+    ManagedBy     = "Terraform"
+    Repository    = "Halligalli-infrastructure"
+    TerraformRoot = "terraform/aks"
+  }
 }
 
 resource "azurerm_virtual_network" "aks" {
-  name                = local.vnet_name
+  name                = "halligalli-aks-vnet"
   resource_group_name = azurerm_resource_group.aks.name
-  location            = local.region
-  address_space       = local.network.vnet_address_space
-  tags                = local.common_tags
+  location            = local.aks_target.region
+  address_space       = ["10.42.0.0/16"]
+  tags                = azurerm_resource_group.aks.tags
 }
 
 resource "azurerm_subnet" "aks_system" {
-  name                 = local.aks_subnet_name
+  name                 = "aks-system"
   resource_group_name  = azurerm_resource_group.aks.name
   virtual_network_name = azurerm_virtual_network.aks.name
-  address_prefixes     = local.network.aks_subnet_prefixes
+  address_prefixes     = ["10.42.0.0/22"]
 }
 
 # Azure CNI needs a pre-authorized control-plane identity for the existing node
 # subnet. This is not Kubernetes Workload Identity or an OIDC federation path.
 resource "azurerm_user_assigned_identity" "aks_control_plane" {
-  name                = local.control_plane_identity
+  name                = "halligalli-aks-control-plane-mi"
   resource_group_name = azurerm_resource_group.aks.name
-  location            = local.region
-  tags                = local.common_tags
+  location            = local.aks_target.region
+  tags                = azurerm_resource_group.aks.tags
 }
 
 resource "azurerm_role_assignment" "aks_subnet_network_contributor" {

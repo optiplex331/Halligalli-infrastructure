@@ -19,59 +19,8 @@ concurrency:
 
 jobs:
   promote-container-apps:
-    runs-on: ubuntu-24.04
-    env:
-      PRODUCT_REPOSITORY: optiplex331/Halligalli-BossYang
-      DESIRED_STATE_PATH: deployment/container-apps/desired-state.json
-      PROMOTION_BRANCH: automation/container-apps-promotion
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          fetch-depth: 0
-          ref: main
-      - name: Resolve formal release
-        env:
-          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
-        run: python3 .github/utils/prepare_release_promotion.py resolve --release-tag "${REQUESTED_RELEASE_TAG}" --promotion-branch automation/container-apps-promotion
-      - name: Download Paired Release Manifest
-        run: curl --fail --location --silent --show-error "${ASSET_URL}" --output paired-release-manifest.json
-      - name: Verify manifest binding
-        id: candidate
-        run: python3 .github/utils/prepare_release_promotion.py inspect --manifest paired-release-manifest.json --expected-tag "${RELEASE_TAG}" --candidate-output release-candidate.json
-      - name: Verify Web artifact provenance
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh attestation verify "oci://${{ steps.candidate.outputs.web_repository }}@${{ steps.candidate.outputs.web_digest }}" --repo "${PRODUCT_REPOSITORY}" --signer-workflow "${PRODUCT_REPOSITORY}/.github/workflows/container.yml" --source-ref "refs/tags/${RELEASE_TAG}" --source-digest "${{ steps.candidate.outputs.commit }}" --deny-self-hosted-runners
-      - name: Verify API artifact provenance
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh attestation verify "oci://${{ steps.candidate.outputs.api_repository }}@${{ steps.candidate.outputs.api_digest }}" --repo "${PRODUCT_REPOSITORY}" --signer-workflow "${PRODUCT_REPOSITORY}/.github/workflows/container.yml" --source-ref "refs/tags/${RELEASE_TAG}" --source-digest "${{ steps.candidate.outputs.commit }}" --deny-self-hosted-runners
-      - name: Smoke digest-pinned paired candidate
-        run: |
-          python3 .github/utils/prepare_release_promotion.py inspect-dependencies --values "${DESIRED_STATE_PATH}"
-          python3 -m unittest discover -s .github/utils/tests -p 'test_*.py'
-      - name: Prepare container-apps desired state only
-        run: python3 .github/utils/prepare_release_promotion.py prepare --candidate release-candidate.json --values "${DESIRED_STATE_PATH}" --output promoted-container-apps.json
-      - name: Apply target-scoped desired state
-        shell: bash
-        run: |
-          set -euo pipefail
-          cp promoted-container-apps.json "${DESIRED_STATE_PATH}"
-          changed_files="$(git diff --name-only)"
-          [[ -z "${changed_files}" || "${changed_files}" == "${DESIRED_STATE_PATH}" ]] || { echo "Promotion may change only ${DESIRED_STATE_PATH}" >&2; exit 1; }
-
-      - name: Create or update Draft target promotion PR
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
-        with:
-          token: ${{ github.token }}
-          branch: ${{ env.PROMOTION_BRANCH }}
-          base: main
-          add-paths: ${{ env.DESIRED_STATE_PATH }}
-          commit-message: "chore(container-apps): promote Halligalli ${{ env.RELEASE_TAG }}"
-          committer: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
-          author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
-          title: "chore(container-apps): promote Halligalli ${{ env.RELEASE_TAG }}"
-          body: >-
-            Target Promotion for the container-apps Live Demo Environment. This Draft changes only
-            ${{ env.DESIRED_STATE_PATH }}; it does not modify AKS desired state or deploy to Azure.
-          draft: always-true
+    name: Propose Container Apps Deployment Desired State
+    uses: ./.github/workflows/promote-target-release.yml
+    with:
+      target: container-apps
+      release_tag: ${{ inputs.release_tag }}

@@ -1,6 +1,5 @@
 {
   "prometheusImage": {"repository": "prom/prometheus", "digest": "sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893"},
-  "grafanaImage": {"repository": "grafana/grafana", "digest": "sha256:121a7a9ece6dc10b969f1f96eed64b4f07dfac0d0b8abc070f7cb83bbde86f63"},
   "collectorImage": {"repository": "otel/opentelemetry-collector-contrib", "digest": "sha256:125bdbeb7590cc1952c5b3430ecf14063568980c2c93d5b38676cc0446ed8108"},
   "tempoImage": {"repository": "grafana/tempo", "digest": "sha256:cda87c212d8c584dc0b89e337e7ed648a5100feb657e5d528480ee4fa03dbbe3"}
 }

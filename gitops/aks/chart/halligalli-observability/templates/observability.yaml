@@ -1,5 +1,5 @@
 {{- $root := . -}}
-{{- range $component := list "prometheus" "grafana" "collector" "tempo" }}
+{{- range $component := list "prometheus" "collector" "tempo" }}
 {{- $image := index $root.Values (printf "%sImage" $component) }}
 apiVersion: v1
 kind: ServiceAccount
@@ -24,7 +24,7 @@ spec:
     app.kubernetes.io/component: {{ $component }}
   ports:
     - name: http
-      port: {{ if eq $component "collector" }}4318{{ else if eq $component "tempo" }}3200{{ else if eq $component "prometheus" }}9090{{ else }}3000{{ end }}
+      port: {{ if eq $component "collector" }}4318{{ else if eq $component "tempo" }}3200{{ else }}9090{{ end }}
       targetPort: http
     {{- if eq $component "tempo" }}
     - name: otlp-http
@@ -73,19 +73,13 @@ spec:
               drop: ["ALL"]
           ports:
             - name: http
-              containerPort: {{ if eq $component "collector" }}4318{{ else if eq $component "tempo" }}3200{{ else if eq $component "prometheus" }}9090{{ else }}3000{{ end }}
+              containerPort: {{ if eq $component "collector" }}4318{{ else if eq $component "tempo" }}3200{{ else }}9090{{ end }}
             {{- if eq $component "tempo" }}
             - name: otlp-http
               containerPort: 4318
             {{- end }}
           {{- if eq $component "prometheus" }}
           args: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=4h"]
-          {{- else if eq $component "grafana" }}
-          env:
-            - name: GF_PATHS_DATA
-              value: /var/lib/grafana
-            - name: GF_AUTH_ANONYMOUS_ENABLED
-              value: "true"
           {{- else if eq $component "collector" }}
           args: ["--config=/etc/otelcol/config.yaml"]
           {{- else }}
@@ -93,54 +87,27 @@ spec:
           {{- end }}
           resources:
             requests:
-              cpu: {{ if eq $component "prometheus" }}100m{{ else if eq $component "tempo" }}100m{{ else }}50m{{ end }}
-              memory: {{ if eq $component "prometheus" }}256Mi{{ else if eq $component "tempo" }}256Mi{{ else }}128Mi{{ end }}
+              cpu: {{ if or (eq $component "prometheus") (eq $component "tempo") }}100m{{ else }}50m{{ end }}
+              memory: {{ if or (eq $component "prometheus") (eq $component "tempo") }}256Mi{{ else }}128Mi{{ end }}
             limits:
-              cpu: {{ if eq $component "prometheus" }}250m{{ else if eq $component "tempo" }}250m{{ else if eq $component "grafana" }}200m{{ else }}250m{{ end }}
-              memory: {{ if eq $component "prometheus" }}512Mi{{ else if eq $component "tempo" }}512Mi{{ else }}256Mi{{ end }}
+              cpu: 250m
+              memory: {{ if or (eq $component "prometheus") (eq $component "tempo") }}512Mi{{ else }}256Mi{{ end }}
           volumeMounts:
-            {{- if eq $component "grafana" }}
-            - name: datasources
-              mountPath: /etc/grafana/provisioning/datasources
-              readOnly: true
-            - name: dashboard-provider
-              mountPath: /etc/grafana/provisioning/dashboards
-              readOnly: true
-            - name: dashboard
-              mountPath: /etc/grafana/dashboards
-              readOnly: true
-            {{- else }}
             - name: config
               mountPath: /etc/{{ if eq $component "collector" }}otelcol{{ else }}{{ $component }}{{ end }}
               readOnly: true
-            {{- end }}
             {{- if eq $component "prometheus" }}
             - name: data
               mountPath: /prometheus
-            {{- else if eq $component "grafana" }}
-            - name: data
-              mountPath: /var/lib/grafana
             {{- else if eq $component "tempo" }}
             - name: data
               mountPath: /var/tempo
             {{- end }}
       volumes:
-        {{- if eq $component "grafana" }}
-        - name: datasources
-          configMap:
-            name: halligalli-observability-grafana-datasources
-        - name: dashboard-provider
-          configMap:
-            name: halligalli-observability-grafana-dashboard-provider
-        - name: dashboard
-          configMap:
-            name: halligalli-observability-grafana-dashboard
-        {{- else }}
         - name: config
           configMap:
             name: halligalli-observability-{{ $component }}
-        {{- end }}
-        {{- if or (eq $component "prometheus") (eq $component "grafana") (eq $component "tempo") }}
+        {{- if or (eq $component "prometheus") (eq $component "tempo") }}
         - name: data
           emptyDir: {}
         {{- end }}
@@ -159,43 +126,6 @@ data:
         metrics_path: /internal/metrics
         static_configs:
           - targets: ['halligalli-api.halligalli.svc.cluster.local:8000']
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: halligalli-observability-grafana-datasources
-data:
-  datasources.yaml: |
-    apiVersion: 1
-    datasources:
-      - name: Prometheus
-        type: prometheus
-        url: http://halligalli-observability-prometheus:9090
-        isDefault: true
-      - name: Tempo
-        type: tempo
-        url: http://halligalli-observability-tempo:3200
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: halligalli-observability-grafana-dashboard-provider
-data:
-  dashboards.yaml: |
-    apiVersion: 1
-    providers:
-      - name: Halligalli
-        folder: Halligalli
-        options:
-          path: /etc/grafana/dashboards
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: halligalli-observability-grafana-dashboard
-data:
-  halligalli.json: |
-    {"title":"Halligalli proof","panels":[{"title":"HTTP outcomes","type":"timeseries","targets":[{"expr":"sum(rate(halligalli_http_requests_total[5m])) by (outcome)"}]},{"title":"Active rooms","type":"stat","targets":[{"expr":"halligalli_active_rooms"}]},{"title":"Traces","type":"traces","datasource":"Tempo"}]}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -255,9 +185,7 @@ spec:
   policyTypes: [Ingress, Egress]
   ingress:
     - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/component: grafana
+        - podSelector: {}
       ports:
         - protocol: TCP
           port: 9090
@@ -273,43 +201,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8000
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              k8s-app: kube-dns
-      ports:
-        - protocol: UDP
-          port: 53
-        - protocol: TCP
-          port: 53
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: halligalli-observability-grafana-flow
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/component: grafana
-  policyTypes: [Egress]
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/component: prometheus
-      ports:
-        - protocol: TCP
-          port: 9090
-    - to:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/component: tempo
-      ports:
-        - protocol: TCP
-          port: 3200
     - to:
         - namespaceSelector:
             matchLabels:
@@ -376,9 +267,7 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/component: grafana
+        - podSelector: {}
       ports:
         - protocol: TCP
           port: 3200

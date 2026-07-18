@@ -1,4 +1,1 @@
-web_image   = "ghcr.io/optiplex331/halligalli-bossyang-web@sha256:replace"
-api_image   = "ghcr.io/optiplex331/halligalli-bossyang-api@sha256:replace"
-redis_image = "docker.io/library/redis@sha256:replace"
-monthly_budget_target_usd   = 25
+monthly_budget_target_usd = 25

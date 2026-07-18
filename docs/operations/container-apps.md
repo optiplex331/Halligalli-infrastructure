@@ -2,17 +2,14 @@
 
 `container-apps` is the target for the continuously available Live Demo Environment at `https://play.halligalli.games`. It uses PR-gated desired state plus an explicit local operator deployment, is not GitOps, and has no public API domain. Checked-in desired state and static validation do not prove that a separately approved live deployment has occurred.
 
-## Runtime and cost target
+## Runtime ownership
 
-One Azure Container App contains three separate containers sharing localhost networking:
-
-| Container | Purpose | CPU | Memory |
-|---|---|---:|---:|
-| Web | nginx public gateway on port 8080 | 0.12 vCPU | 0.25 GiB |
-| API | FastAPI on localhost:8000 | 0.26 vCPU | 0.5 GiB |
-| Redis | ephemeral Redis on localhost:6379 with persistence disabled | 0.12 vCPU | 0.25 GiB |
-
-The initial app total is 0.5 vCPU / 1 GiB with `minReplicas = 1` and `maxReplicas = 1`. The monthly budget target is USD 25. An approved ephemeral platform test on 2026-07-17 showed that Azure rejects the original `0.125 / 0.25 / 0.125` split because each container CPU value may have at most two decimal places; Azure accepted the nearest symmetric `0.12 / 0.26 / 0.12` split without changing the total.
+One Azure Container App contains separate Web, API, and ephemeral Redis
+containers sharing localhost networking. Terraform owns the exact region,
+resource names, resource allocations, scaling limits, images, ingress, and
+platform probes; do not copy those values into operator notes. The checked-in
+Deployment Desired State owns the complete release selection, and the Terraform
+root consumes it directly.
 
 Creating the DNS validation records, managed certificate, and `play.halligalli.games` binding is a separately approved bootstrap operation. AzureRM exposes the app's custom-domain collection as read-only, so this repository does not pretend that Terraform owns that binding or hide it behind deployment.
 
@@ -30,42 +27,68 @@ certificate reaches `Succeeded`, bind it explicitly:
 
 ```bash
 az containerapp hostname bind \
-  --resource-group halligalli-container-apps \
-  --name halligalli-live-demo \
+  --resource-group '<resource group from the reviewed Terraform state>' \
+  --name '<Container App from the reviewed Terraform state>' \
   --hostname play.halligalli.games \
-  --environment halligalli-live-demo \
-  --certificate play-halligalli-games
+  --environment '<Container Apps environment from the reviewed Terraform state>' \
+  --certificate '<managed certificate name>'
 ```
 
 Keep the backend config and `terraform.tfvars` local; neither contains
-application secrets, but both identify the Azure account.
+application secrets, but both identify the Azure account. If an existing
+`terraform.tfvars` still declares `web_image`, `api_image`, or `redis_image`,
+remove those obsolete entries; release images come only from the checked-in
+Deployment Desired State.
 
 ## Promotion and deployment
 
 Run `Target Promotion - Container Apps` manually with a formal Release Tag. It downloads `paired-release-manifest.json`, verifies the tag/commit/Web/API binding and GitHub provenance for each digest, and creates or updates a Draft PR changing only `deployment/container-apps/desired-state.json`. Development Images are rejected by construction.
 
-The checked-in `v0.7.2` values are a non-deployable historical bootstrap reference (`deploymentEnabled: false`) because that release predates the Paired Release Manifest filename. The first successful target promotion must select a formal release that publishes the renamed manifest; promotion sets `deploymentEnabled: true`. The operator script validates this before any app mutation, so the bootstrap placeholder cannot be deployed.
+Terraform reads the checked-in desired-state file directly and rejects a
+disabled, cross-target, incomplete, or non-digest-pinned Web/API/Redis selection
+before apply. Target Promotion owns enabling a deployable formal release. Local
+variable files do not select release images.
 
-After merge to `main`, deploy from a trusted local checkout using the operator's interactive Azure CLI session:
+After merge to `main`, deploy from a trusted local checkout using the operator's interactive Azure CLI session. Initialize the configured backend, save a plan, and review the exact saved plan before approving apply:
 
 ```bash
 az login
 az account set --subscription '<target subscription name or ID>'
-./scripts/deploy-container-apps.sh
+terraform -chdir=terraform/container-apps init -backend-config=backend.hcl
+terraform -chdir=terraform/container-apps plan -out=container-apps.tfplan
+terraform -chdir=terraform/container-apps show container-apps.tfplan
 ```
 
-The script verifies the selected resource group and app, renders a candidate revision, records the current 100% traffic revision, deploys the candidate, checks `/internal/identity`, external HTTPS, and a WebSocket upgrade through the candidate FQDN, then switches traffic. Failure restores the previous verified revision.
+Only after the saved plan has been reviewed and explicitly approved, run the apply and the existing read-only public HTTPS/WebSocket smoke as one operation:
+
+```bash
+terraform -chdir=terraform/container-apps apply container-apps.tfplan && python3 .github/utils/external_monitor.py --origin https://play.halligalli.games
+```
+
+Do not consider the deployment complete if apply or smoke fails. Terraform is the only command in this procedure that mutates the Container App; the smoke is read-only. The Container App uses Single revision mode, so Azure keeps traffic on the prior ready revision until the complete new revision passes its platform probes.
 
 This repository does not store `AZURE_CREDENTIALS`, a user refresh token, a service-principal secret, or a publish profile in GitHub. Interactive login keeps MFA and deployment authority with the operator. It is intentionally a manual control, not unattended CD. If the tenant later permits a workload identity, automation can be proposed separately without changing the promotion boundary.
 
+## Rollback
+
+Rollback restores a complete previously reviewed Paired Release in source control. Revert the promotion commit that changed `deployment/container-apps/desired-state.json`, review and merge that revert, then create and review a new Terraform plan from the resulting `main`. Apply that saved plan and run the same immediate public smoke command above. The revert must restore release version, commit, Web digest, and API digest together; editing or rolling back only one release image is invalid.
+
+Single revision delivery does not retain manual traffic weights or provide an immediate traffic-flip rollback. If a new revision fails platform readiness, Azure leaves traffic on the previous ready revision. If a revision passes readiness but fails the public smoke, restore the previous complete pair through Git review and another approved Terraform apply.
+
 ## Monitoring and readiness
 
-`Monitor Live Demo` runs external HTTPS and WebSocket checks every ten minutes.
-The first failed check opens one GitHub incident; later failures update that open
-incident, and the next successful check records recovery and closes it.
-Repository Issues must be enabled for notifications; replace or extend that sink
-if paging is required. This public monitor is deliberately separate from API
-`/internal/ready`, which is an internal readiness surface used during deployment
-and diagnosis.
+`Monitor Live Demo` runs a read-only public HTTPS and WebSocket uptime check
+once daily and may also be dispatched manually. The workflow owns its exact
+schedule. Either check failing
+fails the workflow directly; the repository does not create or maintain a
+GitHub Issue incident for uptime failures.
+
+The daily check is a basic public availability signal, not a deployment gate.
+Terraform declares HTTP startup and readiness probes for Web, an API startup
+probe plus `/internal/ready` readiness (which checks Redis), and TCP startup and
+readiness probes for Redis. Platform readiness determines whether a revision
+may receive traffic. The operator then runs the same read-only public smoke
+immediately after an approved deployment apply; this establishes external
+HTTPS and WebSocket behavior without waiting for the next daily uptime run.
 
 No command in this runbook authorizes Azure, DNS, or GitHub Environment mutation. Bootstrap and live recovery require separate explicit approval.
