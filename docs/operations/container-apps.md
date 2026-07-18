@@ -60,12 +60,15 @@ This repository does not store `AZURE_CREDENTIALS`, a user refresh token, a serv
 
 ## Monitoring and readiness
 
-`Monitor Live Demo` runs external HTTPS and WebSocket checks every ten minutes.
-The first failed check opens one GitHub incident; later failures update that open
-incident, and the next successful check records recovery and closes it.
-Repository Issues must be enabled for notifications; replace or extend that sink
-if paging is required. This public monitor is deliberately separate from API
-`/internal/ready`, which is an internal readiness surface used during deployment
-and diagnosis.
+`Monitor Live Demo` runs a read-only public HTTPS and WebSocket uptime check
+daily at 06:17 UTC and may also be dispatched manually. Either check failing
+fails the workflow directly; the repository does not create or maintain a
+GitHub Issue incident for uptime failures.
+
+The daily check is a basic public availability signal, not a deployment gate.
+Platform readiness determines whether a revision may receive traffic, and the
+operator runs the same read-only public smoke immediately after an approved
+deployment apply. That immediate post-apply smoke establishes deployment
+completion without waiting for the next daily uptime run.
 
 No command in this runbook authorizes Azure, DNS, or GitHub Environment mutation. Bootstrap and live recovery require separate explicit approval.
