@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
   "target": "container-apps",
-  "deploymentEnabled": false,
-  "releaseVersion": "0.7.2",
-  "releaseCommit": "23cb9f6a3781ec2c7a51c508d6d362f5910d8f5f",
+  "deploymentEnabled": true,
+  "releaseVersion": "0.8.1",
+  "releaseCommit": "0b34864aee5f8de35faa0b338c00f52bfaf9bfcf",
   "webImage": {
     "repository": "ghcr.io/optiplex331/halligalli-bossyang-web",
-    "digest": "sha256:66aa63c8067c96cf966165807fbd65f2ce47d9ef94a36f8a8a88040631e9bf30"
+    "digest": "sha256:b97b60e8acbb8663e0724651e881607ebfc21c31e49791c7cfcf0b11abbb293a"
   },
   "apiImage": {
     "repository": "ghcr.io/optiplex331/halligalli-bossyang-api",
-    "digest": "sha256:3b526dca2be34c9f6cf0c803f1d14f506ef5a412a3b3e834e29b36cfad05ee09"
+    "digest": "sha256:4b48a8c6bc06e4f415b84dc3dfd05084d7055ab897a85a6f8b1316c023c69d08"
   },
   "redisImage": {
     "repository": "docker.io/library/redis",
