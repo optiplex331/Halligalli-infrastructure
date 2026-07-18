@@ -32,11 +32,11 @@ credentials. Do not use `terraform apply` as a validation shortcut.
 
 ## Approved operation model
 
-The approval-gated preflight generates ignored backend/tfvars material, checks
-regional SKU restrictions and quota, an optional configured credit floor,
-retail pricing, selected AKS patch, formal Paired Release, deadline, DNS choice,
-and an exact Terraform create plan. Any mismatch aborts rather than selecting a
-fallback SKU, region, version, release, or DNS path.
+The approval-gated preflight reads one ignored local operation configuration,
+verifies the exact Azure subscription, regional SKU restrictions and quota,
+selected AKS patch, and checked-in GitOps desired state, then produces an exact
+Terraform create plan. Any mismatch aborts rather than selecting a fallback
+subscription, SKU, region, or version. A successful plan never authorizes apply.
 
 The validation lifecycle is create, prove, capture sanitized evidence, destroy,
 then verify empty Terraform state and absence of both resource groups. Follow

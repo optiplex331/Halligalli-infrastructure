@@ -10,47 +10,28 @@ not reusable paired-runtime evidence.
 ## Approval boundary
 
 Every Azure, Terraform remote-plan, Kubernetes, Argo CD, DNS, disruptive,
-rollback, and destroy command requires one explicit local-operation approval
-that names the owner, paired release, temporary DNS choice, cost boundary,
-and four-hour window. Without it, stop. Do not substitute another SKU, region,
-version, release pair, DNS approach, or a stopped historical cluster.
+rollback, and destroy command requires explicit local-operation approval.
+Without it, stop. Do not substitute another subscription, SKU, region, version,
+release pair, DNS approach, or a stopped historical cluster.
 
-The checked-in helper performs no cloud mutations and refuses to run unless
-`HALLIGALLI_OPERATION_APPROVED=1`. It writes ignored local evidence and
-configuration material, and Terraform initialization may acquire a remote
-state lock:
+The checked-in helper performs no cloud mutations and refuses to run unless the
+one ignored operation configuration contains `HALLIGALLI_OPERATION_APPROVED=1`.
+It writes ignored local validation output, and Terraform planning may acquire a
+remote state lock:
 
 ```bash
 cd /path/to/Halligalli-infrastructure
-set -a
-source terraform/aks/local-operation.env
-set +a
-
-mkdir -p .local/aks
-export TERRAFORM_BACKEND_CONFIG_PATH="$PWD/.local/aks/backend.hcl"
-export TERRAFORM_TFVARS_JSON_PATH="$PWD/.local/aks/terraform.auto.tfvars.json"
-# Replace with a currently offered full patch version selected for this run.
-export HALLIGALLI_AKS_KUBERNETES_VERSION="1.XX.Y"
-# The helper downloads and verifies this published schema-V2 release asset,
-# resolves its Product tag commit, and compares both digests with GitOps values.
-export HALLIGALLI_AKS_PROOF_RELEASE_TAG="vX.Y.Z"
-export HALLIGALLI_AKS_PROOF_PRODUCT_REPOSITORY="optiplex331/Halligalli-BossYang"
-python3 .github/utils/write_aks_terraform_config.py
-
-HALLIGALLI_OPERATION_APPROVED=1 \
-  HALLIGALLI_AKS_PROOF_DEADLINE_UTC="2026-07-13T16:00:00Z" \
-  HALLIGALLI_AKS_PROOF_DNS_CHOICE="local-ingress" \
-  gitops/aks/scripts/aks-validation-preflight.sh
+cp terraform/aks/local-operation.env.example terraform/aks/local-operation.env
+# Fill the exact subscription, Terraform Cloud organization/workspace, full
+# Kubernetes patch version, and explicit approval in the ignored file.
+gitops/aks/scripts/aks-validation-preflight.sh
 ```
 
-It records subscription identity, regional `Standard_D4ls_v6` availability and
-restrictions, regional quota, supported selected AKS version, current
-retail-price API data, immutable Paired Release identity, deadline/DNS inputs,
-and a Terraform create plan under ignored `.local/`. The operator must review
-the raw price meter, any explicitly configured credit-floor result, release identity, plan, DNS
-decision, and deadline and write the result in a copy of
-[`evidence/aks-portfolio-proof-record.template.json`](../../evidence/aks-portfolio-proof-record.template.json).
-Abort on any mismatch. A plan does not authorize apply.
+It verifies the exact subscription, regional `Standard_D4ls_v6` availability
+and restrictions, regional quota, supported selected AKS version, and checked-in
+GitOps desired state, then writes a Terraform create plan under ignored
+`.local/`. The operator must review the plan and abort on any mismatch. A plan
+does not authorize apply.
 
 ## Approved execution checklist
 
