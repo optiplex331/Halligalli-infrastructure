@@ -1,6 +1,6 @@
 resource "azurerm_resource_group" "aks" {
   name     = "halligalli-boss-practice-aks-rg"
-  location = "westeurope"
+  location = local.aks_target.region
   tags = {
     Application   = "Halligalli"
     Environment   = "aks"
@@ -13,7 +13,7 @@ resource "azurerm_resource_group" "aks" {
 resource "azurerm_virtual_network" "aks" {
   name                = "halligalli-aks-vnet"
   resource_group_name = azurerm_resource_group.aks.name
-  location            = "westeurope"
+  location            = local.aks_target.region
   address_space       = ["10.42.0.0/16"]
   tags                = azurerm_resource_group.aks.tags
 }
@@ -30,7 +30,7 @@ resource "azurerm_subnet" "aks_system" {
 resource "azurerm_user_assigned_identity" "aks_control_plane" {
   name                = "halligalli-aks-control-plane-mi"
   resource_group_name = azurerm_resource_group.aks.name
-  location            = "westeurope"
+  location            = local.aks_target.region
   tags                = azurerm_resource_group.aks.tags
 }
 

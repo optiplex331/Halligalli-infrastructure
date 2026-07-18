@@ -13,9 +13,11 @@ facts. Raw output and sensitive or identifying operation data stay outside Git.
 
 Terraform owns Azure resources through the AKS cluster boundary. The Terraform
 root describes one concrete target; only the Kubernetes patch version is an
-operation-time input. Resource names, region, network, identity, node shape,
-and tags belong to the `.tf` files and must not be duplicated in prose or local
-configuration.
+operation-time input. Resource names, network, identity, and tags belong to the
+Terraform configuration. Its native `target.tf.json` is the single owner of the
+region, node SKU, node count, per-node vCPU count, and quota family consumed by
+both Terraform and technical preflight; these facts must not be duplicated in
+prose or local configuration.
 
 Argo CD owns the in-cluster runtime and observability Applications. Their
 multi-source definitions select Infrastructure-owned charts and values from

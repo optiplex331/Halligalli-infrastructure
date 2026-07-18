@@ -1,6 +1,6 @@
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = "halligalli-aks"
-  location            = "westeurope"
+  location            = local.aks_target.region
   resource_group_name = azurerm_resource_group.aks.name
   dns_prefix          = "halligalli-aks"
   kubernetes_version  = var.kubernetes_version
@@ -13,8 +13,8 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
   default_node_pool {
     name                 = "system"
-    vm_size              = "Standard_D4ls_v6"
-    node_count           = 2
+    vm_size              = local.aks_target.nodeSku
+    node_count           = local.aks_target.nodeCount
     os_disk_size_gb      = 64
     max_pods             = 30
     auto_scaling_enabled = false

@@ -36,8 +36,10 @@ for command in az terraform python3; do
 done
 
 terraform_root="$repo_root/terraform/aks"
+terraform_target="$terraform_root/target.tf.json"
 output_dir="${HALLIGALLI_AKS_PREFLIGHT_OUTPUT:-$repo_root/.local/aks-preflight}"
-region="westeurope"
+region="$(python3 "$repo_root/.github/utils/validate_aks_preflight.py" target-field \
+  --terraform-target "$terraform_target" --name region)"
 export ARM_SUBSCRIPTION_ID="$AZURE_SUBSCRIPTION_ID"
 
 mkdir -p "$output_dir"
@@ -52,7 +54,8 @@ az vm list-usage --subscription "$AZURE_SUBSCRIPTION_ID" \
 az aks get-versions --subscription "$AZURE_SUBSCRIPTION_ID" \
   --location "$region" -o json > "$output_dir/aks-versions.json"
 
-python3 "$repo_root/.github/utils/validate_aks_preflight.py" \
+python3 "$repo_root/.github/utils/validate_aks_preflight.py" validate \
+  --terraform-target "$terraform_target" \
   --expected-subscription "$AZURE_SUBSCRIPTION_ID" \
   --kubernetes-version "$HALLIGALLI_AKS_KUBERNETES_VERSION" \
   --subscription "$output_dir/subscription.json" \
