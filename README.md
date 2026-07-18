@@ -10,7 +10,7 @@ This repository owns Terraform, target-specific Deployment Desired State, indepe
 
 | Target | Current role | Delivery model |
 |---|---|---|
-| `container-apps` | Continuously available Live Demo at `play.halligalli.games` | PR-gated desired state with an explicit local operator deployment |
+| `container-apps` | Continuously available Live Demo at `play.halligalli.games` | PR-gated desired state with an explicitly approved local Terraform apply |
 | `aks` | Maintained deployment-capable target; last verified baseline `v0.7.2` | Target-scoped promotion and Argo CD GitOps reconciliation during approved validation runs |
 
 Development Images are diagnostic only and cannot enter either formal promotion lane. One promotion changes exactly one target's desired-state file.
@@ -19,7 +19,7 @@ Development Images are diagnostic only and cannot enter either formal promotion 
 
 - `main` accepts changes through pull requests, requires the static validation check, requires resolved review conversations, and rejects force-pushes and deletion.
 - Promotion workflows verify paired Web/API digests and GitHub artifact provenance before opening target-scoped Draft PRs. They cannot merge those PRs.
-- Container Apps deployment is deliberately not executed by GitHub Actions. The operator reviews and merges desired state, signs in locally with `az login`, and runs [`scripts/deploy-container-apps.sh`](scripts/deploy-container-apps.sh).
+- Container Apps deployment is deliberately not executed by GitHub Actions. Terraform consumes the checked-in target desired state directly; the operator reviews a saved local plan, explicitly approves its apply, and immediately runs the read-only public smoke described in the [Container Apps runbook](docs/operations/container-apps.md).
 - No Azure credential, user refresh token, service-principal secret, or publish profile is stored in GitHub.
 - Actions are restricted to GitHub-owned and verified publishers plus explicitly allowlisted repositories. Every referenced action is pinned to a full commit SHA.
 
