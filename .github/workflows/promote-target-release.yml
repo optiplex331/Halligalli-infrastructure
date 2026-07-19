@@ -32,12 +32,6 @@ jobs:
           fetch-depth: 0
           ref: main
 
-      - name: Set up Helm for AKS validation
-        if: inputs.target == 'aks'
-        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
-        with:
-          version: v4.2.2
-
       - name: Resolve closed target and formal release
         env:
           REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
@@ -62,7 +56,20 @@ jobs:
           --output promoted-desired-state.json
           --pr-body-output /tmp/promotion-pr.md
 
+      - name: Set up Helm for AKS validation
+        if: inputs.target == 'aks' && steps.promotion.outputs.promotion_required == 'true'
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.2.2
+
+      - name: Validate promoted AKS desired state
+        if: inputs.target == 'aks' && steps.promotion.outputs.promotion_required == 'true'
+        run: >-
+          helm template halligalli gitops/aks/chart/halligalli
+          --values promoted-desired-state.json > /tmp/halligalli-rendered.yaml
+
       - name: Verify Web artifact provenance
+        if: steps.promotion.outputs.promotion_required == 'true'
         run: >-
           gh attestation verify "oci://${{ steps.promotion.outputs.web_repository }}@${{ steps.promotion.outputs.web_digest }}"
           --repo "${PRODUCT_REPOSITORY}"
@@ -72,6 +79,7 @@ jobs:
           --deny-self-hosted-runners
 
       - name: Verify API artifact provenance
+        if: steps.promotion.outputs.promotion_required == 'true'
         run: >-
           gh attestation verify "oci://${{ steps.promotion.outputs.api_repository }}@${{ steps.promotion.outputs.api_digest }}"
           --repo "${PRODUCT_REPOSITORY}"
@@ -79,12 +87,6 @@ jobs:
           --source-ref "refs/tags/${RELEASE_TAG}"
           --source-digest "${{ steps.promotion.outputs.commit }}"
           --deny-self-hosted-runners
-
-      - name: Validate promoted AKS desired state
-        if: inputs.target == 'aks' && steps.promotion.outputs.promotion_required == 'true'
-        run: >-
-          helm template halligalli gitops/aks/chart/halligalli
-          --values promoted-desired-state.json > /tmp/halligalli-rendered.yaml
 
       - name: Apply target-scoped desired state
         if: steps.promotion.outputs.promotion_required == 'true'

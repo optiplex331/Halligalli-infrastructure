@@ -10,20 +10,9 @@ from pathlib import Path
 from typing import Any
 
 
-DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 VERSION_RE = re.compile(r"^1\.[0-9]{2}\.[0-9]+$")
 BACKEND_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
-DNS_LABEL_RE = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$")
-KUBERNETES_NAME_RE = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,251}[a-z0-9])?$")
 TARGET_KEYS = {"region", "nodeSku", "nodeCount", "vcpusPerNode", "quotaFamily"}
-DESIRED_STATE_KEYS = {
-    "webImage",
-    "apiImage",
-    "redisImage",
-    "releaseVersion",
-    "redisSecretName",
-    "ingress",
-}
 
 
 class AksPreflightError(ValueError):
@@ -170,52 +159,6 @@ def validate_kubernetes_version(
         )
 
 
-def _validate_image(state: dict[str, Any], key: str) -> None:
-    image = state.get(key)
-    if not isinstance(image, dict):
-        raise AksPreflightError(f"AKS desired state requires {key}.")
-    _require_exact_keys(image, {"repository", "digest"}, f"AKS desired state {key}")
-    repository, digest = image.get("repository"), image.get("digest")
-    if (
-        not isinstance(repository, str)
-        or not repository
-        or not isinstance(digest, str)
-        or not DIGEST_RE.fullmatch(digest)
-    ):
-        raise AksPreflightError(f"AKS desired state {key} must be digest pinned.")
-
-
-def _validate_dns_name(value: Any, context: str) -> None:
-    if not isinstance(value, str) or len(value) > 253 or not value:
-        raise AksPreflightError(f"{context} must be a valid DNS subdomain name.")
-    if any(not DNS_LABEL_RE.fullmatch(label) for label in value.split(".")):
-        raise AksPreflightError(f"{context} must be a valid DNS subdomain name.")
-
-
-def _validate_kubernetes_name(value: Any, context: str) -> None:
-    if (
-        not isinstance(value, str)
-        or len(value) > 253
-        or not KUBERNETES_NAME_RE.fullmatch(value)
-    ):
-        raise AksPreflightError(f"{context} must be a valid Kubernetes name.")
-
-
-def validate_desired_state(state: dict[str, Any]) -> None:
-    _require_exact_keys(state, DESIRED_STATE_KEYS, "AKS desired state")
-    for key in ("webImage", "apiImage", "redisImage"):
-        _validate_image(state, key)
-    if not isinstance(state.get("releaseVersion"), str) or not state["releaseVersion"]:
-        raise AksPreflightError("AKS desired state requires releaseVersion.")
-    ingress = state.get("ingress")
-    if not isinstance(ingress, dict):
-        raise AksPreflightError("AKS desired state requires ingress.")
-    _require_exact_keys(ingress, {"host", "tlsSecretName"}, "AKS desired state ingress")
-    _validate_kubernetes_name(state["redisSecretName"], "AKS desired state Redis Secret name")
-    _validate_dns_name(ingress["host"], "AKS desired state ingress host")
-    _validate_kubernetes_name(ingress["tlsSecretName"], "AKS desired state TLS Secret name")
-
-
 def write_backend_config(path: Path, organization: str, workspace: str) -> None:
     if not BACKEND_NAME_RE.fullmatch(organization):
         raise AksPreflightError("HCP Terraform organization contains unsupported characters.")
@@ -255,7 +198,6 @@ def main() -> None:
     validate.add_argument("--resource-skus", type=Path, required=True)
     validate.add_argument("--quota", type=Path, required=True)
     validate.add_argument("--aks-versions", type=Path, required=True)
-    validate.add_argument("--desired-state", type=Path, required=True)
     validate.add_argument("--terraform-organization", required=True)
     validate.add_argument("--terraform-workspace", required=True)
     validate.add_argument("--backend-output", type=Path, required=True)
@@ -270,8 +212,6 @@ def main() -> None:
     validate_sku(load_object(args.resource_skus), target)
     validate_quota(load_array(args.quota), target)
     validate_kubernetes_version(load_object(args.aks_versions), args.kubernetes_version, target)
-    desired_state = load_object(args.desired_state)
-    validate_desired_state(desired_state)
     write_backend_config(args.backend_output, args.terraform_organization, args.terraform_workspace)
     print(
         json.dumps(
@@ -282,7 +222,6 @@ def main() -> None:
                 "nodeCount": target["nodeCount"],
                 "requiredVcpus": target["nodeCount"] * target["vcpusPerNode"],
                 "kubernetesVersion": args.kubernetes_version,
-                "releaseVersion": desired_state["releaseVersion"],
             },
             indent=2,
         )

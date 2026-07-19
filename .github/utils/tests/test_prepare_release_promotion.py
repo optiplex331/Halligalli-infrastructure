@@ -73,6 +73,8 @@ class PrepareReleasePromotionTest(unittest.TestCase):
                 self.assertEqual(promoted["apiImage"]["digest"], "sha256:" + "c" * 64)
                 self.assertIn(expected_marker, body)
                 self.assertIn(TARGETS[target].desired_state_path.as_posix(), body)
+                self.assertIn("Artifact provenance: verified", body)
+                self.assertNotIn("Manifest SHA-256", body)
                 if target == "container-apps":
                     self.assertEqual(promoted["target"], "container-apps")
                     self.assertEqual(promoted["releaseCommit"], "a" * 40)
@@ -92,6 +94,12 @@ class PrepareReleasePromotionTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(promoted)
         self.assertIn("complete Web and API images", result.stderr)
+
+    def test_matching_target_release_is_a_no_op(self) -> None:
+        result, promoted, _ = self.run_prepare("aks", desired_fixture="aks-promoted-desired-state.json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(promoted["releaseVersion"], "1.2.3")
+        self.assertIn('"promotion_required": "false"', result.stdout)
 
     def test_rejects_partial_target_update(self) -> None:
         candidate = validate_release_evidence(

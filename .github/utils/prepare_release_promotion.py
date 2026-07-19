@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import sys
@@ -95,11 +94,11 @@ def validate_target_desired_state(target_name: str, desired_state: Any) -> dict[
         raise PairedReleaseManifestError(f"target must be one of: {', '.join(TARGETS)}")
     if not isinstance(desired_state, dict):
         raise PairedReleaseManifestError("desired state must be a JSON object")
-    if not isinstance(desired_state.get("releaseVersion"), str):
-        raise PairedReleaseManifestError("desired state requires releaseVersion")
-    _require_image(desired_state, "webImage")
-    _require_image(desired_state, "apiImage")
     if target_name == "container-apps":
+        if not isinstance(desired_state.get("releaseVersion"), str):
+            raise PairedReleaseManifestError("desired state requires releaseVersion")
+        _require_image(desired_state, "webImage")
+        _require_image(desired_state, "apiImage")
         if desired_state.get("target") != "container-apps":
             raise PairedReleaseManifestError("container-apps promotion requires container-apps desired state")
         if desired_state.get("schemaVersion") != 1:
@@ -145,7 +144,7 @@ def validate_target_promotion(target_name: str, promoted: dict[str, Any], candid
 
 
 def render_promotion_pr_body(
-    *, target_name: str, release_tag: str, candidate: dict[str, str], asset_url: str, manifest_sha256: str
+    *, target_name: str, release_tag: str, candidate: dict[str, str]
 ) -> str:
     target = TARGETS[target_name]
     return f"""## {target.display_name} promotion
@@ -154,18 +153,17 @@ def render_promotion_pr_body(
 - Product commit: `{candidate['commit']}`
 - Web image: `{candidate['web_repository']}@{candidate['web_digest']}`
 - API image: `{candidate['api_repository']}@{candidate['api_digest']}`
-- Paired Release Manifest: {asset_url}
-- Manifest SHA-256: `{manifest_sha256}`
-- Artifact provenance: both digests matched the Product repository, signer workflow, source tag, and source commit
+- Artifact provenance: verified
+- Desired state: `{target.desired_state_path}`
 
-This Draft PR changes only `{target.desired_state_path}` for the {target.display_name}. It neither modifies the other Deployment Target nor deploys infrastructure.
+Review whether this release should be deployed to the {target.display_name} and whether an operational reason blocks it. This Draft PR neither modifies the other Deployment Target nor deploys infrastructure.
 """
 
 
 def prepare_promotion(
     *, target_name: str, release_tag: str, manifest_path: Path, repo_root: Path, output_path: Path, pr_body_path: Path
 ) -> dict[str, str]:
-    resolved = resolve_promotion_request(target_name, release_tag)
+    resolve_promotion_request(target_name, release_tag)
     target = TARGETS[target_name]
     manifest_bytes = manifest_path.read_bytes()
     candidate = validate_release_evidence(json.loads(manifest_bytes), expected_tag=release_tag)
@@ -178,8 +176,6 @@ def prepare_promotion(
             target_name=target_name,
             release_tag=release_tag,
             candidate=candidate,
-            asset_url=resolved["asset_url"],
-            manifest_sha256=hashlib.sha256(manifest_bytes).hexdigest(),
         ),
         encoding="utf-8",
     )

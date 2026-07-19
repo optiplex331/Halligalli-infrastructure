@@ -41,6 +41,11 @@ namespace="halligalli"
 observability_namespace="halligalli-observability"
 tls_secret="halligalli-orbstack-tls"
 
+if [ "$mode" = "run" ] && [ -z "${HALLIGALLI_ORBSTACK_VALUES:-}" ]; then
+  echo "OrbStack run requires an explicit HALLIGALLI_ORBSTACK_VALUES file." >&2
+  exit 1
+fi
+
 for command in docker kubectl helm openssl python3; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "OrbStack preflight requires $command in PATH; do not install it from this helper." >&2
@@ -70,21 +75,18 @@ helm lint "$chart_path" --values "$values_path" \
 helm lint "$observability_chart_path" \
   --values "$observability_values" >/dev/null
 
-# The AKS preflight validator owns shared target-wide desired-state requirements.
-redis_secret="$(PYTHONPATH="$repo_root/.github/utils" python3 - "$values_path" <<'PY'
+redis_secret="$(python3 - "$values_path" <<'PY'
+import json
 import sys
 from pathlib import Path
 
-from validate_aks_preflight import load_object, validate_desired_state
-
-values = load_object(Path(sys.argv[1]))
-validate_desired_state(values)
+values = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 print(values["redisSecretName"])
 PY
 )"
 
 if [ "$mode" = "preflight" ]; then
-  printf '%s\n' "OrbStack preflight passed: shared desired-state validation and both closed Chart schemas passed."
+  printf '%s\n' "OrbStack preflight passed: both closed Chart schemas passed."
   printf '%s\n' "No Kubernetes, Azure, DNS, or registry operation was performed."
   exit 0
 fi
@@ -93,16 +95,6 @@ if [ "${HALLIGALLI_ORBSTACK_APPROVED:-}" != "1" ]; then
   echo "Refusing local Kubernetes mutation without HALLIGALLI_ORBSTACK_APPROVED=1." >&2
   exit 1
 fi
-
-python3 - "$values_path" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-values = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-if values["releaseVersion"] == "0.0.0-placeholder":
-    raise SystemExit("run requires a selected Paired Release values file, not checked-in placeholders.")
-PY
 
 kubectl cluster-info >/dev/null
 kubectl get ingressclass nginx >/dev/null
