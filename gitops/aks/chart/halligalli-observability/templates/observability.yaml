@@ -125,7 +125,7 @@ data:
       - job_name: halligalli-api
         metrics_path: /internal/metrics
         static_configs:
-          - targets: ['halligalli-api.halligalli.svc.cluster.local:8000']
+          - targets: ['halligalli-api.halligalli.svc.cluster.local:80']
 ---
 apiVersion: v1
 kind: ConfigMap
