@@ -34,13 +34,6 @@ spec:
           port: 8080
   egress:
     - to:
-        - podSelector:
-            matchLabels:
-              {{- include "halligalli.selectorLabels" (dict "component" "api") | nindent 14 }}
-      ports:
-        - protocol: TCP
-          port: 8000
-    - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: kube-system
@@ -66,9 +59,6 @@ spec:
   policyTypes: [Ingress, Egress]
   ingress:
     - from:
-        - podSelector:
-            matchLabels:
-              {{- include "halligalli.selectorLabels" (dict "component" "web") | nindent 14 }}
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ingress-nginx
