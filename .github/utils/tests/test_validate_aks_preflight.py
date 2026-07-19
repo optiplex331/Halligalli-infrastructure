@@ -12,7 +12,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from validate_aks_preflight import (  # noqa: E402
     AksPreflightError,
     load_target_facts,
-    validate_desired_state,
     validate_kubernetes_version,
     validate_quota,
     validate_sku,
@@ -21,7 +20,6 @@ from validate_aks_preflight import (  # noqa: E402
 )
 
 
-DIGEST = "sha256:" + "a" * 64
 TARGET = {
     "region": "westeurope",
     "nodeSku": "Standard_D4ls_v6",
@@ -29,17 +27,6 @@ TARGET = {
     "vcpusPerNode": 4,
     "quotaFamily": "StandardDlsv6Family",
 }
-
-
-def desired_state() -> dict[str, object]:
-    return {
-        "releaseVersion": "0.7.2",
-        "webImage": {"repository": "example/web", "digest": DIGEST},
-        "apiImage": {"repository": "example/api", "digest": DIGEST},
-        "redisImage": {"repository": "redis", "digest": DIGEST},
-        "redisSecretName": "halligalli-redis-auth",
-        "ingress": {"host": "proof.invalid", "tlsSecretName": "proof-tls"},
-    }
 
 
 class ValidateAksPreflightTest(unittest.TestCase):
@@ -70,7 +57,6 @@ class ValidateAksPreflightTest(unittest.TestCase):
             "1.35.5",
             TARGET,
         )
-        validate_desired_state(desired_state())
 
     def test_loads_target_facts_from_terraform_native_configuration(self) -> None:
         target_path = Path(__file__).resolve().parents[3] / "terraform/aks/target.tf.json"
@@ -148,52 +134,6 @@ class ValidateAksPreflightTest(unittest.TestCase):
             validate_kubernetes_version(
                 {"values": [{"version": "1.35.4"}]}, "1.35.5", TARGET
             )
-
-    def test_rejects_unpinned_desired_state_image(self) -> None:
-        with self.assertRaisesRegex(AksPreflightError, "digest pinned"):
-            state = desired_state()
-            state["webImage"] = {"repository": "example/web", "digest": "latest"}
-            validate_desired_state(state)
-
-    def test_rejects_missing_redis_secret_name(self) -> None:
-        state = desired_state()
-        del state["redisSecretName"]
-        with self.assertRaisesRegex(AksPreflightError, "missing redisSecretName"):
-            validate_desired_state(state)
-
-    def test_rejects_invalid_kubernetes_ingress_name(self) -> None:
-        state = desired_state()
-        state["ingress"] = {"host": "proof.invalid", "tlsSecretName": "Invalid_Name"}
-        with self.assertRaisesRegex(AksPreflightError, "TLS Secret name"):
-            validate_desired_state(state)
-
-    def test_rejects_invalid_ingress_host_label(self) -> None:
-        state = desired_state()
-        state["ingress"] = {"host": f"{'a' * 64}.invalid", "tlsSecretName": "proof-tls"}
-        with self.assertRaisesRegex(AksPreflightError, "ingress host"):
-            validate_desired_state(state)
-
-    def test_rejects_extra_desired_state_fields_at_every_level(self) -> None:
-        cases = []
-        top_level = desired_state()
-        top_level["replicas"] = 2
-        cases.append(top_level)
-        image = desired_state()
-        image["webImage"] = {"repository": "example/web", "digest": DIGEST, "tag": "latest"}
-        cases.append(image)
-        ingress = desired_state()
-        ingress["ingress"] = {
-            "host": "proof.invalid",
-            "tlsSecretName": "proof-tls",
-            "className": "nginx",
-        }
-        cases.append(ingress)
-
-        for state in cases:
-            with self.subTest(state=state), self.assertRaisesRegex(
-                AksPreflightError, "unsupported"
-            ):
-                validate_desired_state(state)
 
     def test_writes_backend_config_for_the_selected_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

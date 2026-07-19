@@ -32,14 +32,21 @@ topology spread, restricted security contexts, ServiceAccounts, and
 NetworkPolicies. Ingress sends public REST and WebSocket paths to API and all
 other public paths to Web; internal API surfaces remain cluster-only. Redis is
 ephemeral and receives a locally generated ACL Secret, never a credential in
-Git. The chart schemas are the authority for the closed values contracts.
+Git. The chart schemas are the sole authority for values shape, required
+fields, closed objects, non-empty rendered strings, and digest syntax. Helm
+templates render those values without repeating schema validation; Kubernetes
+owns platform resource-name validation.
 
 The Product repository owns source, formal Release Tags, Release Images,
 artifact provenance, and the Paired Release Manifest. `Target Promotion - AKS`
 validates that evidence and proposes a Draft PR changing only the AKS desired
 state. It cannot merge the PR, reconcile Argo CD, or deploy Azure resources.
-Rollback selects a complete previously reviewed Web/API pair; mixed selection,
-one-image rollback, and `kubectl rollout undo` are invalid.
+Promotion establishes release trust once. Reviewers decide whether that Release
+Tag should be deployed to AKS, confirm the target-scoped diff, and consider
+operational blockers without manually repeating manifest, digest, or provenance
+checks. A no-op promotion does not repeat provenance. Rollback restores a
+complete previously reviewed Web/API pair without re-running promotion; mixed
+selection, one-image rollback, and `kubectl rollout undo` are invalid.
 
 ## Safety boundary
 
@@ -69,21 +76,23 @@ helm lint gitops/aks/chart/halligalli-observability --values gitops/aks/values/h
 ```
 
 These checks validate source, structured utilities, Terraform configuration,
-and the closed charts. They do not prove Azure networking, Argo CD
-reconciliation, multi-node scheduling, disruption, DNS, rollback, cost, or
-destruction.
+and the chart schemas against checked-in values. Promotion renders newly
+generated AKS values against the same runtime schema. These checks do not prove
+Azure networking, Argo CD reconciliation, multi-node scheduling, disruption,
+DNS, rollback, cost, or destruction.
 
 ## Local OrbStack integration
 
 OrbStack is the low-cost Kubernetes runtime seam. Its preflight confirms the
-active Docker engine and Kubernetes context are OrbStack, delegates desired
-state to the shared validator, and lints both chart schemas without mutation:
+active Docker engine and Kubernetes context are OrbStack and lints both chart
+schemas without mutation:
 
 ```bash
 gitops/aks/scripts/orbstack-integration.sh preflight
 ```
 
-`run` requires a separately supplied formal, digest-pinned values file and
+`run` requires an explicit `HALLIGALLI_ORBSTACK_VALUES` path to a separately
+supplied, reviewed, digest-pinned values file and
 `HALLIGALLI_ORBSTACK_APPROVED=1`. It creates disposable local Kubernetes
 resources, checks runtime and observability rollouts, verifies every current
 Ready Web/API Pod image digest, checks Ingress, Secrets, NetworkPolicies,
@@ -104,12 +113,12 @@ gitops/aks/scripts/aks-validation-preflight.sh
 ```
 
 The script verifies the exact selected subscription, the fixed target region
-and node SKU, available quota, the requested supported Kubernetes patch, and
-the checked-in digest-pinned desired state. It then initializes the configured
-remote backend and saves a Terraform create plan under ignored `.local/`
-output. Review the saved plan and abort on any mismatch. The script performs no
-cloud mutation, but its credentialed reads and remote plan still require the
-operation approval described above.
+and node SKU, available quota, and the requested supported Kubernetes patch.
+It trusts the reviewed `main` desired state that already passed static PR
+validation, initializes the configured remote backend, and saves a Terraform
+create plan under ignored `.local/` output. Review the saved plan and abort on
+any mismatch. The script performs no cloud mutation, but its credentialed
+reads and remote plan still require the operation approval described above.
 
 ## Approved validation procedure
 

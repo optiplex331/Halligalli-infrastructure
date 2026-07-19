@@ -44,6 +44,12 @@ Deployment Desired State.
 
 Run `Target Promotion - Container Apps` manually with a formal Release Tag. It downloads `paired-release-manifest.json`, verifies the tag/commit/Web/API binding and GitHub provenance for each digest, and creates or updates a Draft PR changing only `deployment/container-apps/desired-state.json`. Development Images are rejected by construction.
 
+Promotion establishes release trust once. Reviewers decide whether to deploy
+the selected Release Tag to the Container Apps target, confirm the target-only
+diff, and consider operational blockers without manually repeating manifest,
+digest, or provenance checks. A request for the already selected release is a
+no-op and does not repeat provenance.
+
 Terraform reads the checked-in desired-state file directly and rejects a
 disabled, cross-target, incomplete, or non-digest-pinned Web/API/Redis selection
 before apply. Target Promotion owns enabling a deployable formal release. Local

@@ -62,7 +62,6 @@ python3 "$repo_root/.github/utils/validate_aks_preflight.py" validate \
   --resource-skus "$output_dir/resource-skus.json" \
   --quota "$output_dir/quota.json" \
   --aks-versions "$output_dir/aks-versions.json" \
-  --desired-state "$repo_root/gitops/aks/values/halligalli.values.json" \
   --terraform-organization "$HCP_TERRAFORM_ORGANIZATION" \
   --terraform-workspace "$HCP_TERRAFORM_WORKSPACE" \
   --backend-output "$output_dir/backend.hcl" \

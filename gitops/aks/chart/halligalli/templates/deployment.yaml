@@ -1,4 +1,3 @@
-{{- include "halligalli.validateValues" . -}}
 {{- $root := . -}}
 {{- range $component := list "web" "api" }}
 {{- $image := ternary $root.Values.webImage $root.Values.apiImage (eq $component "web") }}
