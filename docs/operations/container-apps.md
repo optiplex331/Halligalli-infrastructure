@@ -50,10 +50,11 @@ diff, and consider operational blockers without manually repeating manifest,
 digest, or provenance checks. A request for the already selected release is a
 no-op and does not repeat provenance.
 
-Terraform reads the checked-in desired-state file directly and rejects a
-disabled, cross-target, incomplete, or non-digest-pinned Web/API/Redis selection
-before apply. Target Promotion owns enabling a deployable formal release. Local
-variable files do not select release images.
+Terraform reads the checked-in desired-state file directly and rejects disabled
+deployment or incomplete, mutable, and placeholder Web/API/Redis image
+references before apply. Promotion alone establishes the formal Web/API release
+binding, target metadata, and artifact provenance; Terraform does not repeat
+those checks. Local variable files do not select release images.
 
 After merge to `main`, deploy from a trusted local checkout using the operator's interactive Azure CLI session. Initialize the configured backend, save a plan, and review the exact saved plan before approving apply:
 

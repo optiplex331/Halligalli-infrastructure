@@ -1,8 +1,6 @@
 locals {
   desired_state = jsondecode(file("${path.root}/../../deployment/container-apps/desired-state.json"))
 
-  release_version  = try(local.desired_state.releaseVersion, "")
-  release_commit   = try(local.desired_state.releaseCommit, "")
   web_repository   = try(local.desired_state.webImage.repository, "")
   web_digest       = try(local.desired_state.webImage.digest, "")
   api_repository   = try(local.desired_state.apiImage.repository, "")
@@ -14,18 +12,15 @@ locals {
   api_image   = "${local.api_repository}@${local.api_digest}"
   redis_image = "${local.redis_repository}@${local.redis_digest}"
 
-  desired_state_is_complete = alltrue([
-    try(local.desired_state.schemaVersion == 1, false),
-    try(local.desired_state.target == "container-apps", false),
-    try(local.desired_state.deploymentEnabled == true, false),
-    can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+$", local.release_version)),
-    can(regex("^[0-9a-f]{40}$", local.release_commit)),
-    local.web_repository != "",
-    can(regex("^sha256:[0-9a-f]{64}$", local.web_digest)),
-    local.api_repository != "",
-    can(regex("^sha256:[0-9a-f]{64}$", local.api_digest)),
-    local.redis_repository != "",
-    can(regex("^sha256:[0-9a-f]{64}$", local.redis_digest)),
+  desired_state_images_are_deployable = alltrue([
+    for image in [
+      { repository = local.web_repository, digest = local.web_digest },
+      { repository = local.api_repository, digest = local.api_digest },
+      { repository = local.redis_repository, digest = local.redis_digest },
+    ] :
+    image.repository != "" &&
+    can(regex("^sha256:[0-9a-f]{64}$", image.digest)) &&
+    image.digest != "sha256:0000000000000000000000000000000000000000000000000000000000000000"
   ])
 }
 
@@ -148,8 +143,13 @@ resource "azurerm_container_app" "live_demo" {
 
   lifecycle {
     precondition {
-      condition     = local.desired_state_is_complete
-      error_message = "The checked-in Container Apps desired state must enable schemaVersion 1 for target container-apps and select one complete digest-pinned Web/API/Redis release pair."
+      condition     = try(local.desired_state.deploymentEnabled == true, false)
+      error_message = "The checked-in Container Apps desired state must explicitly enable deployment."
+    }
+
+    precondition {
+      condition     = local.desired_state_images_are_deployable
+      error_message = "The checked-in Container Apps desired state must select complete, digest-pinned, non-placeholder Web, API, and Redis images."
     }
   }
 }
