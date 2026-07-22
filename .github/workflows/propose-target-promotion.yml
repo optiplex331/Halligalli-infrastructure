@@ -1,4 +1,4 @@
-name: Reusable Target Promotion
+name: Reusable Target Promotion Proposal
 
 on:
   workflow_call:
@@ -37,7 +37,7 @@ jobs:
           REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
           REQUESTED_TARGET: ${{ inputs.target }}
         run: >-
-          python3 .github/utils/prepare_release_promotion.py resolve
+          python3 .github/utils/prepare_target_promotion.py resolve
           --target "${REQUESTED_TARGET}"
           --release-tag "${REQUESTED_RELEASE_TAG}"
 
@@ -49,7 +49,7 @@ jobs:
       - name: Prepare target-scoped Deployment Desired State and evidence
         id: promotion
         run: >-
-          python3 .github/utils/prepare_release_promotion.py prepare
+          python3 .github/utils/prepare_target_promotion.py prepare
           --target "${TARGET}"
           --release-tag "${RELEASE_TAG}"
           --manifest paired-release-manifest.json

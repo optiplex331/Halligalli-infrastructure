@@ -1,5 +1,5 @@
 locals {
-  desired_state = jsondecode(file("${path.root}/../../deployment/container-apps/desired-state.json"))
+  desired_state = jsondecode(file("${path.root}/../desired-state.json"))
 
   web_repository   = try(local.desired_state.webImage.repository, "")
   web_digest       = try(local.desired_state.webImage.digest, "")

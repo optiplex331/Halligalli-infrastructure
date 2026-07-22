@@ -3,10 +3,10 @@
 set -eu
 
 repo_root="$(CDPATH='' cd -- "$(dirname -- "$0")/../../.." && pwd)"
-operation_config="$repo_root/terraform/aks/local-operation.env"
+operation_config="$repo_root/targets/aks/terraform/local-operation.env"
 
 [ -f "$operation_config" ] || {
-  echo "Copy terraform/aks/local-operation.env.example to the ignored local-operation.env and fill it locally." >&2
+  echo "Copy targets/aks/terraform/local-operation.env.example to the ignored local-operation.env and fill it locally." >&2
   exit 1
 }
 
@@ -23,7 +23,7 @@ set +a
 for name in AZURE_SUBSCRIPTION_ID HCP_TERRAFORM_ORGANIZATION HCP_TERRAFORM_WORKSPACE HALLIGALLI_AKS_KUBERNETES_VERSION; do
   eval "value=\${$name:-}"
   [ -n "$value" ] || {
-    echo "Set $name in terraform/aks/local-operation.env." >&2
+    echo "Set $name in targets/aks/terraform/local-operation.env." >&2
     exit 1
   }
 done
@@ -35,7 +35,7 @@ for command in az terraform python3; do
   }
 done
 
-terraform_root="$repo_root/terraform/aks"
+terraform_root="$repo_root/targets/aks/terraform"
 terraform_target="$terraform_root/target.tf.json"
 output_dir="${HALLIGALLI_AKS_PREFLIGHT_OUTPUT:-$repo_root/.local/aks-preflight}"
 region="$(python3 "$repo_root/.github/utils/validate_aks_preflight.py" target-field \

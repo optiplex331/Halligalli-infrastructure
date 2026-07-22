@@ -6,7 +6,7 @@ resource "azurerm_resource_group" "aks" {
     Environment   = "aks"
     ManagedBy     = "Terraform"
     Repository    = "Halligalli-infrastructure"
-    TerraformRoot = "terraform/aks"
+    TerraformRoot = "targets/aks/terraform"
   }
 }
 

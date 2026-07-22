@@ -29,10 +29,11 @@ case "$mode" in
 esac
 
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
-gitops_root="$(CDPATH='' cd -- "$script_dir/.." && pwd)"
-repo_root="$(CDPATH='' cd -- "$gitops_root/../.." && pwd)"
-chart_path="$gitops_root/chart/halligalli"
-observability_chart_path="$gitops_root/chart/halligalli-observability"
+aks_root="$(CDPATH='' cd -- "$script_dir/.." && pwd)"
+gitops_root="$aks_root/gitops"
+repo_root="$(CDPATH='' cd -- "$aks_root/../.." && pwd)"
+chart_path="$gitops_root/charts/halligalli"
+observability_chart_path="$gitops_root/charts/halligalli-observability"
 default_values="$gitops_root/values/halligalli.values.json"
 observability_values="$gitops_root/values/halligalli-observability.values.json"
 values_path="${HALLIGALLI_ORBSTACK_VALUES:-$default_values}"

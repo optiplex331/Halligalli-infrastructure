@@ -20,7 +20,7 @@ concurrency:
 jobs:
   promote-container-apps:
     name: Propose Container Apps Deployment Desired State
-    uses: ./.github/workflows/promote-target-release.yml
+    uses: ./.github/workflows/propose-target-promotion.yml
     with:
       target: container-apps
       release_tag: ${{ inputs.release_tag }}

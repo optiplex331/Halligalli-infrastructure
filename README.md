@@ -15,6 +15,12 @@ This repository owns Terraform, target-specific Deployment Desired State, indepe
 
 Development Images are diagnostic only and cannot enter either formal promotion lane. One promotion changes exactly one target's desired-state file.
 
+Target-owned implementation lives under `targets/<target>/`. Container Apps
+owns its Deployment Desired State and Terraform root there. AKS owns its
+Terraform root, GitOps applications, charts and values, target scripts, and
+sanitized validation evidence there. The targets intentionally have different
+internal structures because they use different delivery models.
+
 ## Delivery controls
 
 - `main` accepts changes through pull requests, requires the static validation check, requires resolved review conversations, and rejects force-pushes and deletion.
@@ -28,14 +34,14 @@ Development Images are diagnostic only and cannot enter either formal promotion 
 ```bash
 python3 -m unittest discover -s .github/utils/tests -p 'test_*.py'
 actionlint
-terraform -chdir=terraform/container-apps fmt -check -recursive
-terraform -chdir=terraform/container-apps init -backend=false -input=false
-terraform -chdir=terraform/container-apps validate -no-color
-terraform -chdir=terraform/aks fmt -check -recursive
-terraform -chdir=terraform/aks init -backend=false -input=false
-terraform -chdir=terraform/aks validate -no-color
-helm lint gitops/aks/chart/halligalli --values gitops/aks/values/halligalli.values.json
-helm lint gitops/aks/chart/halligalli-observability --values gitops/aks/values/halligalli-observability.values.json
+terraform -chdir=targets/container-apps/terraform fmt -check -recursive
+terraform -chdir=targets/container-apps/terraform init -backend=false -input=false
+terraform -chdir=targets/container-apps/terraform validate -no-color
+terraform -chdir=targets/aks/terraform fmt -check -recursive
+terraform -chdir=targets/aks/terraform init -backend=false -input=false
+terraform -chdir=targets/aks/terraform validate -no-color
+helm lint targets/aks/gitops/charts/halligalli --values targets/aks/gitops/values/halligalli.values.json
+helm lint targets/aks/gitops/charts/halligalli-observability --values targets/aks/gitops/values/halligalli-observability.values.json
 ```
 
 These commands are static validation only. Never use a cloud apply as validation.
@@ -43,5 +49,5 @@ These commands are static validation only. Never use a cloud apply as validation
 The only operational runbooks are [Container Apps Live Demo](docs/operations/container-apps.md)
 and [AKS Deployment Target](docs/operations/aks.md). Executable desired state owns
 current release, platform, resource, and dependency selections. Future completed
-AKS run facts live only in dated files under `evidence/`; the existing
-`evidence/aks-validation-summary.json` is an immutable historical exception.
+AKS run facts live only in dated files under `targets/aks/evidence/`; the existing
+`targets/aks/evidence/validation-summary.json` is an immutable historical exception.

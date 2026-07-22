@@ -43,20 +43,20 @@ jobs:
 
       - name: Terraform format check
         run: |
-          terraform -chdir=terraform/container-apps fmt -check -recursive
-          terraform -chdir=terraform/aks fmt -check -recursive
+          terraform -chdir=targets/container-apps/terraform fmt -check -recursive
+          terraform -chdir=targets/aks/terraform fmt -check -recursive
 
       - name: Terraform init without backend
         run: |
-          terraform -chdir=terraform/container-apps init -backend=false -input=false
-          terraform -chdir=terraform/aks init -backend=false -input=false
+          terraform -chdir=targets/container-apps/terraform init -backend=false -input=false
+          terraform -chdir=targets/aks/terraform init -backend=false -input=false
 
       - name: Terraform validate
         run: |
-          terraform -chdir=terraform/container-apps validate -no-color
-          terraform -chdir=terraform/aks validate -no-color
+          terraform -chdir=targets/container-apps/terraform validate -no-color
+          terraform -chdir=targets/aks/terraform validate -no-color
 
       - name: Validate Helm charts and values
         run: |
-          helm lint gitops/aks/chart/halligalli --values gitops/aks/values/halligalli.values.json
-          helm lint gitops/aks/chart/halligalli-observability --values gitops/aks/values/halligalli-observability.values.json
+          helm lint targets/aks/gitops/charts/halligalli --values targets/aks/gitops/values/halligalli.values.json
+          helm lint targets/aks/gitops/charts/halligalli-observability --values targets/aks/gitops/values/halligalli-observability.values.json
