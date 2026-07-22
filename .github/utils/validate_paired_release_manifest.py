@@ -1,9 +1,6 @@
-"""Validate a schema-V2 Paired Release Manifest without changing desired state."""
+"""Validate a schema-V2 Paired Release Manifest."""
 
-import argparse
-import json
 import re
-from pathlib import Path
 from typing import Any
 
 TAG_RE = re.compile(r"^v[0-9]+\.[0-9]+\.[0-9]+$")
@@ -49,25 +46,3 @@ def validate_release_evidence(manifest: dict[str, Any], *, expected_tag: str) ->
     if manifest.get("releaseTag") != expected_tag:
         raise PairedReleaseManifestError("manifest does not match the requested release tag")
     return candidate
-
-
-def validate_file_to_output(manifest_path: Path, *, expected_tag: str, output_path: Path) -> dict[str, str]:
-    candidate = validate_release_evidence(json.loads(manifest_path.read_text()), expected_tag=expected_tag)
-    output_path.write_text(json.dumps(candidate, indent=2) + "\n")
-    return candidate
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("manifest", type=Path)
-    parser.add_argument("--expected-tag", required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    args = parser.parse_args()
-    try:
-        validate_file_to_output(args.manifest, expected_tag=args.expected_tag, output_path=args.output)
-    except (json.JSONDecodeError, OSError, PairedReleaseManifestError) as error:
-        parser.exit(1, f"{error}\n")
-
-
-if __name__ == "__main__":
-    main()

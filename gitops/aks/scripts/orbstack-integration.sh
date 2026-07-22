@@ -119,9 +119,7 @@ helm upgrade --install halligalli-orbstack "$chart_path" --namespace "$namespace
 helm upgrade --install halligalli-orbstack-observability "$observability_chart_path" \
   --namespace "$observability_namespace" --create-namespace --values "$observability_values"
 
-for deployment in halligalli-web halligalli-api halligalli-redis; do
-  kubectl -n "$namespace" rollout status "deployment/$deployment" --timeout=180s
-done
+kubectl -n "$namespace" rollout status deployment/halligalli-redis --timeout=180s
 python3 "$repo_root/.github/utils/verify_running_pod_digests.py" \
   --values "$values_path" --namespace "$namespace" --rollout-timeout 180s
 for deployment in prometheus collector tempo; do

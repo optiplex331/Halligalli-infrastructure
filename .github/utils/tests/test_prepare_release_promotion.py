@@ -13,13 +13,12 @@ UTILS = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "promotion"
 sys.path.insert(0, str(UTILS))
 
-from prepare_release_promotion import (  # noqa: E402
+from release_promotion import (  # noqa: E402
     TARGETS,
     PairedReleaseManifestError,
+    prepare_promotion,
     resolve_promotion_request,
-    validate_target_promotion,
 )
-from validate_paired_release_manifest import validate_release_evidence  # noqa: E402
 
 
 class PrepareReleasePromotionTest(unittest.TestCase):
@@ -101,18 +100,28 @@ class PrepareReleasePromotionTest(unittest.TestCase):
         self.assertEqual(promoted["releaseVersion"], "1.2.3")
         self.assertIn('"promotion_required": "false"', result.stdout)
 
-    def test_rejects_partial_target_update(self) -> None:
-        candidate = validate_release_evidence(
-            json.loads((FIXTURES / "paired-release-manifest.json").read_text()), expected_tag="v1.2.3"
+    def test_replaces_stale_release_fields_as_one_pair(self) -> None:
+        desired_state = json.loads((FIXTURES / "container-apps-desired-state.json").read_text())
+        desired_state.update(
+            {
+                "releaseVersion": None,
+                "releaseCommit": "not-a-commit",
+                "deploymentEnabled": False,
+                "webImage": {"repository": "stale"},
+                "apiImage": {"digest": "stale"},
+            }
         )
-        promoted = json.loads((FIXTURES / "aks-desired-state.json").read_text())
-        promoted["releaseVersion"] = "1.2.3"
-        promoted["webImage"] = {
-            "repository": candidate["web_repository"],
-            "digest": candidate["web_digest"],
-        }
-        with self.assertRaisesRegex(PairedReleaseManifestError, "complete Web/API digest pair"):
-            validate_target_promotion("aks", promoted, candidate)
+        promotion = prepare_promotion(
+            target_name="container-apps",
+            release_tag="v1.2.3",
+            manifest=json.loads((FIXTURES / "paired-release-manifest.json").read_text()),
+            desired_state=desired_state,
+        )
+        self.assertEqual(promotion.desired_state["releaseVersion"], "1.2.3")
+        self.assertEqual(promotion.desired_state["releaseCommit"], "a" * 40)
+        self.assertTrue(promotion.desired_state["deploymentEnabled"])
+        self.assertEqual(promotion.desired_state["webImage"]["digest"], "sha256:" + "b" * 64)
+        self.assertEqual(promotion.desired_state["apiImage"]["digest"], "sha256:" + "c" * 64)
 
     def test_resolve_uses_closed_target_metadata(self) -> None:
         self.assertEqual(resolve_promotion_request("aks", "v1.2.3")["promotion_branch"], "automation/release-promotion")
@@ -122,6 +131,34 @@ class PrepareReleasePromotionTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(PairedReleaseManifestError, "target must be one of"):
             resolve_promotion_request("all", "v1.2.3")
+
+    def test_resolve_writes_only_environment_values(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            environment_path = root / "github-env.txt"
+            output_path = root / "github-output.txt"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(UTILS / "prepare_release_promotion.py"),
+                    "resolve",
+                    "--target",
+                    "aks",
+                    "--release-tag",
+                    "v1.2.3",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "GITHUB_ENV": str(environment_path),
+                    "GITHUB_OUTPUT": str(output_path),
+                },
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("ASSET_URL=", environment_path.read_text())
+            self.assertFalse(output_path.exists())
 
 
 if __name__ == "__main__":

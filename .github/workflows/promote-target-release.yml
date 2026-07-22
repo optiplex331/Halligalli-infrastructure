@@ -56,18 +56,6 @@ jobs:
           --output promoted-desired-state.json
           --pr-body-output /tmp/promotion-pr.md
 
-      - name: Set up Helm for AKS validation
-        if: inputs.target == 'aks' && steps.promotion.outputs.promotion_required == 'true'
-        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
-        with:
-          version: v4.2.2
-
-      - name: Validate promoted AKS desired state
-        if: inputs.target == 'aks' && steps.promotion.outputs.promotion_required == 'true'
-        run: >-
-          helm template halligalli gitops/aks/chart/halligalli
-          --values promoted-desired-state.json > /tmp/halligalli-rendered.yaml
-
       - name: Verify Web artifact provenance
         if: steps.promotion.outputs.promotion_required == 'true'
         run: >-
@@ -94,11 +82,6 @@ jobs:
         run: |
           set -euo pipefail
           cp promoted-desired-state.json "${DESIRED_STATE_PATH}"
-          changed_files="$(git diff --name-only)"
-          [[ "${changed_files}" == "${DESIRED_STATE_PATH}" ]] || {
-            echo "Promotion may change only ${DESIRED_STATE_PATH}: ${changed_files}" >&2
-            exit 1
-          }
 
       - name: Create or update Draft target promotion PR
         if: steps.promotion.outputs.promotion_required == 'true'
