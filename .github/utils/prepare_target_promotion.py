@@ -35,49 +35,35 @@ class PromotionError(ValueError):
     pass
 
 
-def _validate_release_evidence(manifest: Any, expected_tag: str) -> dict[str, str]:
-    if not isinstance(manifest, dict):
-        raise PromotionError("manifest must be a JSON object")
-
-    tag = manifest.get("releaseTag")
-    commit = manifest.get("commit")
-    identity = manifest.get("runtimeIdentity")
-    images = manifest.get("images")
-    if (
-        manifest.get("schemaVersion") != 2
-        or not isinstance(tag, str)
-        or not TAG_RE.fullmatch(tag)
-    ):
-        raise PromotionError("manifest requires schema-V2 formal releaseTag")
-    if not isinstance(commit, str) or not COMMIT_RE.fullmatch(commit):
-        raise PromotionError("manifest requires a full lowercase commit")
-
-    version = tag.removeprefix("v")
-    if identity != {"version": version, "commit": commit}:
-        raise PromotionError("runtime identity must match release tag and commit")
-    if not isinstance(images, dict) or set(images) != set(PRODUCT_IMAGES):
-        raise PromotionError("manifest requires complete Web and API images")
-
-    candidate = {"version": version, "commit": commit}
-    for role, repository in PRODUCT_IMAGES.items():
-        image = images.get(role)
-        if (
-            not isinstance(image, dict)
-            or image.get("repository") != repository
-            or image.get("tag") != version
-        ):
-            raise PromotionError(f"manifest requires canonical {role} image identity")
-        digest = image.get("digest")
-        if (
-            not isinstance(digest, str)
-            or not DIGEST_RE.fullmatch(digest)
-            or digest == "sha256:" + "0" * 64
-        ):
-            raise PromotionError(f"{role} image requires immutable digest")
-        candidate[f"{role}_repository"] = repository
-        candidate[f"{role}_digest"] = digest
-    if tag != expected_tag:
+def _promotion_candidate(manifest: Any, release_tag: str) -> dict[str, str]:
+    if not isinstance(manifest, dict) or manifest.get("schemaVersion") != 2:
+        raise PromotionError("manifest schema is not supported")
+    if manifest.get("releaseTag") != release_tag:
         raise PromotionError("manifest does not match the requested release tag")
+
+    try:
+        commit = manifest["commit"]
+        digests = {
+            role: manifest["images"][role]["digest"] for role in PRODUCT_IMAGES
+        }
+    except (KeyError, TypeError):
+        raise PromotionError("manifest is missing promotion evidence") from None
+
+    if not isinstance(commit, str) or not COMMIT_RE.fullmatch(commit):
+        raise PromotionError("manifest commit is invalid")
+    if any(
+        not isinstance(digest, str) or not DIGEST_RE.fullmatch(digest)
+        for digest in digests.values()
+    ):
+        raise PromotionError("manifest image digest is invalid")
+
+    candidate = {
+        "version": release_tag.removeprefix("v"),
+        "commit": commit,
+    }
+    for role, repository in PRODUCT_IMAGES.items():
+        candidate[f"{role}_repository"] = repository
+        candidate[f"{role}_digest"] = digests[role]
     return candidate
 
 
@@ -147,7 +133,7 @@ def _prepare_resolved_promotion(
     manifest: Any,
     desired_state: Any,
 ) -> dict[str, Any]:
-    candidate = _validate_release_evidence(manifest, release_tag)
+    candidate = _promotion_candidate(manifest, release_tag)
     promoted = _build_target_promotion(target_name, desired_state, candidate)
     return {
         "desired_state": promoted,
@@ -159,10 +145,12 @@ def _prepare_resolved_promotion(
         "outputs": {
             **request,
             "commit": candidate["commit"],
-            "web_repository": candidate["web_repository"],
-            "web_digest": candidate["web_digest"],
-            "api_repository": candidate["api_repository"],
-            "api_digest": candidate["api_digest"],
+            "web_image": (
+                f'{candidate["web_repository"]}@{candidate["web_digest"]}'
+            ),
+            "api_image": (
+                f'{candidate["api_repository"]}@{candidate["api_digest"]}'
+            ),
             "promotion_required": "true" if promoted != desired_state else "false",
         },
     }

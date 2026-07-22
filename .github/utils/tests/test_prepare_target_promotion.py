@@ -108,7 +108,7 @@ class PrepareTargetPromotionTest(unittest.TestCase):
             promoted,
             json.loads((FIXTURES / "aks-desired-state.json").read_text()),
         )
-        self.assertIn("complete Web and API images", result.stderr)
+        self.assertIn("missing promotion evidence", result.stderr)
 
     def test_matching_target_release_is_a_no_op(self) -> None:
         result, promoted, _, _ = self.run_prepare(
@@ -152,26 +152,51 @@ class PrepareTargetPromotionTest(unittest.TestCase):
                 desired_state=desired_state,
             )
 
-    def test_rejects_mutable_or_inconsistent_release_evidence(self) -> None:
+    def test_ignores_release_fields_not_consumed_by_promotion(self) -> None:
         desired_state = json.loads((FIXTURES / "aks-desired-state.json").read_text())
-        cases = []
-        mixed = json.loads((FIXTURES / "paired-release-manifest.json").read_text())
-        mixed["images"]["api"]["tag"] = "1.2.4"
-        cases.append(mixed)
-        mutable = json.loads((FIXTURES / "paired-release-manifest.json").read_text())
-        mutable["images"]["web"]["digest"] = "latest"
-        cases.append(mutable)
-        inconsistent = json.loads((FIXTURES / "paired-release-manifest.json").read_text())
-        inconsistent["runtimeIdentity"]["commit"] = "d" * 40
-        cases.append(inconsistent)
-        for manifest in cases:
-            with self.subTest(manifest=manifest), self.assertRaises(PromotionError):
-                prepare_promotion(
-                    target_name="aks",
-                    release_tag="v1.2.3",
-                    manifest=manifest,
-                    desired_state=desired_state,
-                )
+        manifest = json.loads((FIXTURES / "paired-release-manifest.json").read_text())
+        manifest["runtimeIdentity"] = {"version": "unused", "commit": "unused"}
+        manifest["images"]["web"]["repository"] = "unused"
+        manifest["images"]["api"]["tag"] = "unused"
+
+        promotion = prepare_promotion(
+            target_name="aks",
+            release_tag="v1.2.3",
+            manifest=manifest,
+            desired_state=desired_state,
+        )
+
+        self.assertEqual(
+            promotion["desired_state"]["webImage"]["repository"],
+            "ghcr.io/optiplex331/halligalli-bossyang-web",
+        )
+        self.assertEqual(promotion["desired_state"]["releaseVersion"], "1.2.3")
+
+    def test_rejects_unknown_manifest_schema(self) -> None:
+        desired_state = json.loads((FIXTURES / "aks-desired-state.json").read_text())
+        manifest = json.loads((FIXTURES / "paired-release-manifest.json").read_text())
+        manifest["schemaVersion"] = 999
+
+        with self.assertRaisesRegex(PromotionError, "schema is not supported"):
+            prepare_promotion(
+                target_name="aks",
+                release_tag="v1.2.3",
+                manifest=manifest,
+                desired_state=desired_state,
+            )
+
+    def test_rejects_evidence_that_cannot_be_used_safely(self) -> None:
+        desired_state = json.loads((FIXTURES / "aks-desired-state.json").read_text())
+        manifest = json.loads((FIXTURES / "paired-release-manifest.json").read_text())
+        manifest["images"]["web"]["digest"] = "latest"
+
+        with self.assertRaisesRegex(PromotionError, "digest is invalid"):
+            prepare_promotion(
+                target_name="aks",
+                release_tag="v1.2.3",
+                manifest=manifest,
+                desired_state=desired_state,
+            )
 
     def test_prepare_uses_closed_target_metadata(self) -> None:
         desired_state = json.loads((FIXTURES / "aks-desired-state.json").read_text())
@@ -204,10 +229,10 @@ class PrepareTargetPromotionTest(unittest.TestCase):
                 "promotion_branch=automation/aks-promotion",
                 "commit_message=chore(aks): promote Halligalli v1.2.3",
                 "commit=" + "a" * 40,
-                "web_repository=ghcr.io/optiplex331/halligalli-bossyang-web",
-                "web_digest=sha256:" + "b" * 64,
-                "api_repository=ghcr.io/optiplex331/halligalli-bossyang-api",
-                "api_digest=sha256:" + "c" * 64,
+                "web_image=ghcr.io/optiplex331/halligalli-bossyang-web@sha256:"
+                + "b" * 64,
+                "api_image=ghcr.io/optiplex331/halligalli-bossyang-api@sha256:"
+                + "c" * 64,
                 "promotion_required=true",
             },
         )

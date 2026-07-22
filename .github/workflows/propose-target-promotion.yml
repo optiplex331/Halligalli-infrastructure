@@ -29,7 +29,6 @@ jobs:
       - name: Check out Infrastructure Repo
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          fetch-depth: 0
           ref: main
 
       - name: Download public Paired Release Manifest
@@ -40,7 +39,7 @@ jobs:
           "https://github.com/${PRODUCT_REPOSITORY}/releases/download/${RELEASE_TAG}/paired-release-manifest.json"
           --output paired-release-manifest.json
 
-      - name: Prepare target-scoped Deployment Desired State and evidence
+      - name: Prepare target-scoped Deployment Desired State
         id: promotion
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
@@ -56,10 +55,10 @@ jobs:
         if: steps.promotion.outputs.promotion_required == 'true'
         shell: bash
         env:
-          API_IMAGE: ${{ steps.promotion.outputs.api_repository }}@${{ steps.promotion.outputs.api_digest }}
+          API_IMAGE: ${{ steps.promotion.outputs.api_image }}
           COMMIT: ${{ steps.promotion.outputs.commit }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-          WEB_IMAGE: ${{ steps.promotion.outputs.web_repository }}@${{ steps.promotion.outputs.web_digest }}
+          WEB_IMAGE: ${{ steps.promotion.outputs.web_image }}
         run: |
           set -euo pipefail
           for image in "${WEB_IMAGE}" "${API_IMAGE}"; do
