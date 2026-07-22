@@ -16,7 +16,7 @@ PRODUCT_IMAGES = {
     "web": "ghcr.io/optiplex331/halligalli-bossyang-web",
     "api": "ghcr.io/optiplex331/halligalli-bossyang-api",
 }
-TARGETS: dict[str, dict[str, str]] = {
+TARGETS = {
     "aks": {
         "desired_state_path": "targets/aks/gitops/values/halligalli.values.json",
         "promotion_branch": "automation/aks-promotion",
@@ -103,8 +103,13 @@ def _build_target_promotion(
 ) -> dict[str, Any]:
     if not isinstance(desired_state, dict):
         raise PromotionError("desired state must be a JSON object")
-    if target_name == "container-apps" and desired_state.get("target") != "container-apps":
-        raise PromotionError("container-apps promotion requires container-apps desired state")
+    if (
+        target_name == "container-apps"
+        and desired_state.get("target") != "container-apps"
+    ):
+        raise PromotionError(
+            "container-apps promotion requires container-apps desired state"
+        )
     if target_name == "aks" and "target" in desired_state:
         raise PromotionError("AKS promotion rejects desired state for another target")
 
@@ -121,18 +126,20 @@ def _build_target_promotion(
     return promoted
 
 
-def _render_pr_body(*, target_name: str, release_tag: str, candidate: dict[str, str]) -> str:
+def _render_pr_body(
+    *, target_name: str, release_tag: str, candidate: dict[str, str]
+) -> str:
     target = TARGETS[target_name]
-    return f"""## {target['display_name']} promotion
+    return f"""## {target["display_name"]} promotion
 
 - Release Tag: `{release_tag}`
-- Product commit: `{candidate['commit']}`
-- Web image: `{candidate['web_repository']}@{candidate['web_digest']}`
-- API image: `{candidate['api_repository']}@{candidate['api_digest']}`
+- Product commit: `{candidate["commit"]}`
+- Web image: `{candidate["web_repository"]}@{candidate["web_digest"]}`
+- API image: `{candidate["api_repository"]}@{candidate["api_digest"]}`
 - Artifact provenance: verified
-- Desired state: `{target['desired_state_path']}`
+- Desired state: `{target["desired_state_path"]}`
 
-Review whether this release should be deployed to the {target['display_name']} and whether an operational reason blocks it. This Draft PR neither modifies the other Deployment Target nor deploys infrastructure.
+Review whether this release should be deployed to the {target["display_name"]} and whether an operational reason blocks it. This Draft PR neither modifies the other Deployment Target nor deploys infrastructure.
 """
 
 
@@ -203,7 +210,8 @@ def main() -> None:
                 ),
             )
             args.output.write_text(
-                json.dumps(promotion["desired_state"], indent=2) + "\n", encoding="utf-8"
+                json.dumps(promotion["desired_state"], indent=2) + "\n",
+                encoding="utf-8",
             )
             args.pr_body_output.write_text(promotion["pr_body"], encoding="utf-8")
             result = promotion["outputs"]
