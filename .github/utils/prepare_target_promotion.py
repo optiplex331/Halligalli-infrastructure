@@ -163,14 +163,6 @@ def prepare_promotion(
     }
 
 
-def write_environment(values: dict[str, str]) -> None:
-    command_file_path = os.environ.get("GITHUB_ENV")
-    if command_file_path:
-        with Path(command_file_path).open("a", encoding="utf-8") as command_file:
-            for name, value in values.items():
-                command_file.write(f"{name.upper()}={value}\n")
-
-
 def write_outputs(values: dict[str, str]) -> None:
     command_file_path = os.environ.get("GITHUB_OUTPUT")
     if command_file_path:
@@ -196,7 +188,7 @@ def main() -> None:
     try:
         if args.command == "resolve":
             result = resolve_promotion_request(args.target, args.release_tag)
-            write_environment(result)
+            write_outputs(result)
         else:
             target = resolve_promotion_request(args.target, args.release_tag)
             promotion = prepare_promotion(

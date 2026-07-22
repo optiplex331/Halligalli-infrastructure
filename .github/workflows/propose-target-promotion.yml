@@ -33,6 +33,7 @@ jobs:
           ref: main
 
       - name: Resolve closed target and formal release
+        id: request
         env:
           REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
           REQUESTED_TARGET: ${{ inputs.target }}
@@ -42,12 +43,17 @@ jobs:
           --release-tag "${REQUESTED_RELEASE_TAG}"
 
       - name: Download public Paired Release Manifest
+        env:
+          ASSET_URL: ${{ steps.request.outputs.asset_url }}
         run: >-
           curl --fail --location --silent --show-error
           "${ASSET_URL}" --output paired-release-manifest.json
 
       - name: Prepare target-scoped Deployment Desired State and evidence
         id: promotion
+        env:
+          RELEASE_TAG: ${{ steps.request.outputs.release_tag }}
+          TARGET: ${{ steps.request.outputs.target }}
         run: >-
           python3 .github/utils/prepare_target_promotion.py prepare
           --target "${TARGET}"
@@ -58,6 +64,8 @@ jobs:
 
       - name: Verify Web artifact provenance
         if: steps.promotion.outputs.promotion_required == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.request.outputs.release_tag }}
         run: >-
           gh attestation verify "oci://${{ steps.promotion.outputs.web_repository }}@${{ steps.promotion.outputs.web_digest }}"
           --repo "${PRODUCT_REPOSITORY}"
@@ -68,6 +76,8 @@ jobs:
 
       - name: Verify API artifact provenance
         if: steps.promotion.outputs.promotion_required == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.request.outputs.release_tag }}
         run: >-
           gh attestation verify "oci://${{ steps.promotion.outputs.api_repository }}@${{ steps.promotion.outputs.api_digest }}"
           --repo "${PRODUCT_REPOSITORY}"
@@ -79,6 +89,8 @@ jobs:
       - name: Apply target-scoped desired state
         if: steps.promotion.outputs.promotion_required == 'true'
         shell: bash
+        env:
+          DESIRED_STATE_PATH: ${{ steps.request.outputs.desired_state_path }}
         run: |
           set -euo pipefail
           cp promoted-desired-state.json "${DESIRED_STATE_PATH}"
@@ -88,12 +100,12 @@ jobs:
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ github.token }}
-          branch: ${{ env.PROMOTION_BRANCH }}
+          branch: ${{ steps.request.outputs.promotion_branch }}
           base: main
-          add-paths: ${{ env.DESIRED_STATE_PATH }}
-          commit-message: ${{ env.COMMIT_MESSAGE }}
+          add-paths: ${{ steps.request.outputs.desired_state_path }}
+          commit-message: ${{ steps.request.outputs.commit_message }}
           committer: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
           author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
-          title: ${{ env.COMMIT_MESSAGE }}
+          title: ${{ steps.request.outputs.commit_message }}
           body-path: /tmp/promotion-pr.md
           draft: always-true

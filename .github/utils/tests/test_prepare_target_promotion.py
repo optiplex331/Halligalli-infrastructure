@@ -169,7 +169,7 @@ class PrepareTargetPromotionTest(unittest.TestCase):
         with self.assertRaisesRegex(PromotionError, "target must be one of"):
             resolve_promotion_request("all", "v1.2.3")
 
-    def test_resolve_writes_only_environment_values(self) -> None:
+    def test_resolve_writes_step_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             environment_path = root / "github-env.txt"
@@ -194,8 +194,18 @@ class PrepareTargetPromotionTest(unittest.TestCase):
                 },
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("ASSET_URL=", environment_path.read_text())
-            self.assertFalse(output_path.exists())
+            self.assertFalse(environment_path.exists())
+            self.assertEqual(
+                set(output_path.read_text().splitlines()),
+                {
+                    "target=aks",
+                    "release_tag=v1.2.3",
+                    "desired_state_path=targets/aks/gitops/values/halligalli.values.json",
+                    "promotion_branch=automation/aks-promotion",
+                    "asset_url=https://github.com/optiplex331/Halligalli-BossYang/releases/download/v1.2.3/paired-release-manifest.json",
+                    "commit_message=chore(aks): promote Halligalli v1.2.3",
+                },
+            )
 
 
 if __name__ == "__main__":
