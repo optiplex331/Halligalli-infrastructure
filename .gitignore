@@ -22,10 +22,10 @@ terraform.auto.tfvars.json
 # Local environment files
 .env
 .env.*
-terraform/aks/local-operation.env
+targets/aks/terraform/local-operation.env
 
 # Operator evidence is local by default. Only the historical summary and
 # reviewed, deliberately sanitized dated summaries may be committed.
-evidence/*
-!evidence/aks-validation-summary.json
-!evidence/aks-validation-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].json
+targets/aks/evidence/*
+!targets/aks/evidence/validation-summary.json
+!targets/aks/evidence/validation-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].json

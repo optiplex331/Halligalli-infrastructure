@@ -17,7 +17,7 @@ Creating the DNS validation records, managed certificate, and `play.halligalli.g
 
 Bootstrap uses Azure AD authentication and remote Terraform state. Create the
 state resource group, storage account, and private `tfstate` container first,
-then copy `terraform/container-apps/backend.hcl.example` to the ignored
+then copy `targets/container-apps/terraform/backend.hcl.example` to the ignored
 `backend.hcl` and initialize with `terraform init -backend-config=backend.hcl`.
 
 Apply the resource group and environment targets first, then run a complete
@@ -42,7 +42,7 @@ Deployment Desired State.
 
 ## Promotion and deployment
 
-Run `Target Promotion - Container Apps` manually with a formal Release Tag. It downloads `paired-release-manifest.json`, verifies the tag/commit/Web/API binding and GitHub provenance for each digest, and creates or updates a Draft PR changing only `deployment/container-apps/desired-state.json`. Development Images are rejected by construction.
+Run `Target Promotion - Container Apps` manually with a formal Release Tag. It downloads `paired-release-manifest.json`, verifies the tag/commit/Web/API binding and GitHub provenance for each digest, and creates or updates a Draft PR changing only `targets/container-apps/desired-state.json`. Development Images are rejected by construction.
 
 Promotion establishes release trust once. Reviewers decide whether to deploy
 the selected Release Tag to the Container Apps target, confirm the target-only
@@ -61,15 +61,15 @@ After merge to `main`, deploy from a trusted local checkout using the operator's
 ```bash
 az login
 az account set --subscription '<target subscription name or ID>'
-terraform -chdir=terraform/container-apps init -backend-config=backend.hcl
-terraform -chdir=terraform/container-apps plan -out=container-apps.tfplan
-terraform -chdir=terraform/container-apps show container-apps.tfplan
+terraform -chdir=targets/container-apps/terraform init -backend-config=backend.hcl
+terraform -chdir=targets/container-apps/terraform plan -out=container-apps.tfplan
+terraform -chdir=targets/container-apps/terraform show container-apps.tfplan
 ```
 
 Only after the saved plan has been reviewed and explicitly approved, run the apply and the existing read-only public HTTPS/WebSocket smoke as one operation:
 
 ```bash
-terraform -chdir=terraform/container-apps apply container-apps.tfplan && python3 .github/utils/external_monitor.py --origin https://play.halligalli.games
+terraform -chdir=targets/container-apps/terraform apply container-apps.tfplan && python3 .github/utils/external_monitor.py --origin https://play.halligalli.games
 ```
 
 Do not consider the deployment complete if apply or smoke fails. Terraform is the only command in this procedure that mutates the Container App; the smoke is read-only. The Container App uses Single revision mode, so Azure keeps traffic on the prior ready revision until the complete new revision passes its platform probes.
@@ -78,7 +78,7 @@ This repository does not store `AZURE_CREDENTIALS`, a user refresh token, a serv
 
 ## Rollback
 
-Rollback restores a complete previously reviewed Paired Release in source control. Revert the promotion commit that changed `deployment/container-apps/desired-state.json`, review and merge that revert, then create and review a new Terraform plan from the resulting `main`. Apply that saved plan and run the same immediate public smoke command above. The revert must restore release version, commit, Web digest, and API digest together; editing or rolling back only one release image is invalid.
+Rollback restores a complete previously reviewed Paired Release in source control. Revert the promotion commit that changed `targets/container-apps/desired-state.json`, review and merge that revert, then create and review a new Terraform plan from the resulting `main`. Apply that saved plan and run the same immediate public smoke command above. The revert must restore release version, commit, Web digest, and API digest together; editing or rolling back only one release image is invalid.
 
 Single revision delivery does not retain manual traffic weights or provide an immediate traffic-flip rollback. If a new revision fails platform readiness, Azure leaves traffic on the previous ready revision. If a revision passes readiness but fails the public smoke, restore the previous complete pair through Git review and another approved Terraform apply.
 

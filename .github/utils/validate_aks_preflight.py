@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -18,12 +17,6 @@ TARGET_KEYS = {"region", "nodeSku", "nodeCount"}
 
 class AksPreflightError(ValueError):
     """Raised when an AKS preflight input is not safe to use."""
-
-
-@dataclass(frozen=True)
-class SkuCapacity:
-    quota_family: str
-    vcpus_per_node: int
 
 
 def load_object(path: Path) -> dict[str, Any]:
@@ -77,7 +70,7 @@ def validate_subscription(account: dict[str, Any], expected_id: str) -> dict[str
     return {"id": expected_id, "name": str(account.get("name", ""))}
 
 
-def validate_sku(payload: dict[str, Any], target: dict[str, Any]) -> SkuCapacity:
+def validate_sku(payload: dict[str, Any], target: dict[str, Any]) -> tuple[str, int]:
     values = payload.get("value")
     if not isinstance(values, list):
         raise AksPreflightError("Azure Resource SKU data does not contain a value list.")
@@ -117,10 +110,16 @@ def validate_sku(payload: dict[str, Any], target: dict[str, Any]) -> SkuCapacity
         raise AksPreflightError(f"{target['nodeSku']} reports an invalid vCPU capacity.") from error
     if vcpus_per_node < 1:
         raise AksPreflightError(f"{target['nodeSku']} reports an invalid vCPU capacity.")
-    return SkuCapacity(quota_family=quota_family, vcpus_per_node=vcpus_per_node)
+    return quota_family, vcpus_per_node
 
 
-def validate_quota(payload: list[Any], target: dict[str, Any], capacity: SkuCapacity) -> None:
+def validate_quota(
+    payload: list[Any],
+    target: dict[str, Any],
+    *,
+    quota_family: str,
+    vcpus_per_node: int,
+) -> None:
     usage: dict[str, tuple[int, int]] = {}
     for item in payload:
         if not isinstance(item, dict) or not isinstance(item.get("name"), dict):
@@ -131,8 +130,8 @@ def validate_quota(payload: list[Any], target: dict[str, Any], capacity: SkuCapa
                 usage[name] = (int(item.get("currentValue", 0)), int(item.get("limit", 0)))
             except (TypeError, ValueError) as error:
                 raise AksPreflightError(f"Azure quota {name} has invalid usage values.") from error
-    required_vcpus = target["nodeCount"] * capacity.vcpus_per_node
-    for name in ("cores", capacity.quota_family):
+    required_vcpus = target["nodeCount"] * vcpus_per_node
+    for name in ("cores", quota_family):
         if name not in usage:
             raise AksPreflightError(f"Required Azure quota {name} was not returned.")
         current, limit = usage[name]
@@ -214,8 +213,13 @@ def main() -> None:
         return
 
     subscription = validate_subscription(load_object(args.subscription), args.expected_subscription)
-    capacity = validate_sku(load_object(args.resource_skus), target)
-    validate_quota(load_array(args.quota), target, capacity)
+    quota_family, vcpus_per_node = validate_sku(load_object(args.resource_skus), target)
+    validate_quota(
+        load_array(args.quota),
+        target,
+        quota_family=quota_family,
+        vcpus_per_node=vcpus_per_node,
+    )
     validate_kubernetes_version(load_object(args.aks_versions), args.kubernetes_version, target)
     write_backend_config(args.backend_output, args.terraform_organization, args.terraform_workspace)
     print(
@@ -225,7 +229,7 @@ def main() -> None:
                 "region": target["region"],
                 "nodeSku": target["nodeSku"],
                 "nodeCount": target["nodeCount"],
-                "requiredVcpus": target["nodeCount"] * capacity.vcpus_per_node,
+                "requiredVcpus": target["nodeCount"] * vcpus_per_node,
                 "kubernetesVersion": args.kubernetes_version,
             },
             indent=2,

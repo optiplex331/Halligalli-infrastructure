@@ -2,16 +2,17 @@
   "apiVersion": "argoproj.io/v1alpha1",
   "kind": "Application",
   "metadata": {
-    "name": "halligalli-observability",
+    "name": "halligalli",
     "namespace": "argocd",
     "labels": {
-      "app.kubernetes.io/name": "halligalli-observability",
+      "app.kubernetes.io/name": "halligalli",
       "app.kubernetes.io/part-of": "aks",
       "halligalli.games/phase": "validation-run"
     },
     "annotations": {
       "halligalli.games/desired-state-owner": "Halligalli-infrastructure",
-      "halligalli.games/lifecycle": "disposable-validation-run"
+      "halligalli.games/image-policy": "digest-pinned-paired-release",
+      "halligalli.games/public-entry": "operation-time-ingress-host"
     }
   },
   "spec": {
@@ -20,11 +21,11 @@
       {
         "repoURL": "https://github.com/optiplex331/Halligalli-infrastructure.git",
         "targetRevision": "main",
-        "path": "gitops/aks/chart/halligalli-observability",
+        "path": "targets/aks/gitops/charts/halligalli",
         "helm": {
-          "releaseName": "halligalli-observability",
+          "releaseName": "halligalli",
           "valueFiles": [
-            "$values/gitops/aks/values/halligalli-observability.values.json"
+            "$values/targets/aks/gitops/values/halligalli.values.json"
           ]
         }
       },
@@ -36,7 +37,7 @@
     ],
     "destination": {
       "server": "https://kubernetes.default.svc",
-      "namespace": "halligalli-observability"
+      "namespace": "halligalli"
     },
     "syncPolicy": {
       "automated": {
@@ -44,7 +45,10 @@
         "selfHeal": true,
         "allowEmpty": false
       },
-      "syncOptions": ["CreateNamespace=true", "PruneLast=true"]
+      "syncOptions": [
+        "CreateNamespace=true",
+        "PruneLast=true"
+      ]
     },
     "revisionHistoryLimit": 10
   }

@@ -5,7 +5,7 @@ Demo Environment, and checked-in desired state does not claim that an AKS
 workload exists. This runbook is the single operational reference for the
 target and for an explicitly approved AKS Validation Run.
 
-The immutable, sanitized summary under `evidence/` is the sole owner of the
+The immutable, sanitized summary under `targets/aks/evidence/` is the sole owner of the
 last completed run's release, dependency, platform, capability, and destruction
 facts. Raw output and sensitive or identifying operation data stay outside Git.
 
@@ -69,11 +69,11 @@ From the repository root:
 ```bash
 python3 -m unittest discover -s .github/utils/tests -p 'test_*.py'
 actionlint
-terraform -chdir=terraform/aks fmt -check -recursive
-terraform -chdir=terraform/aks init -backend=false -input=false
-terraform -chdir=terraform/aks validate -no-color
-helm lint gitops/aks/chart/halligalli --values gitops/aks/values/halligalli.values.json
-helm lint gitops/aks/chart/halligalli-observability --values gitops/aks/values/halligalli-observability.values.json
+terraform -chdir=targets/aks/terraform fmt -check -recursive
+terraform -chdir=targets/aks/terraform init -backend=false -input=false
+terraform -chdir=targets/aks/terraform validate -no-color
+helm lint targets/aks/gitops/charts/halligalli --values targets/aks/gitops/values/halligalli.values.json
+helm lint targets/aks/gitops/charts/halligalli-observability --values targets/aks/gitops/values/halligalli-observability.values.json
 ```
 
 These checks validate source, structured utilities, Terraform configuration,
@@ -89,7 +89,7 @@ active Docker engine and Kubernetes context are OrbStack and lints both chart
 schemas without mutation:
 
 ```bash
-gitops/aks/scripts/orbstack-integration.sh preflight
+targets/aks/scripts/orbstack-integration.sh preflight
 ```
 
 `run` requires an explicit `HALLIGALLI_ORBSTACK_VALUES` path to a separately
@@ -108,9 +108,9 @@ An approved AKS Validation Run uses one ignored local operation configuration
 and one preflight command:
 
 ```bash
-cp terraform/aks/local-operation.env.example terraform/aks/local-operation.env
+cp targets/aks/terraform/local-operation.env.example targets/aks/terraform/local-operation.env
 # Fill every field and record explicit approval in the ignored file.
-gitops/aks/scripts/aks-validation-preflight.sh
+targets/aks/scripts/aks-validation-preflight.sh
 ```
 
 The script verifies the exact selected subscription, the fixed target region
@@ -130,7 +130,7 @@ Only after the preflight passes and each operation has explicit approval:
    in private run notes. Review and apply the exact Terraform plan, then record
    the resulting cluster shape privately.
 2. Generate the Redis credential locally with
-   `gitops/aks/scripts/apply-redis-auth-secret.sh`. Bootstrap the controllers,
+   `targets/aks/scripts/apply-redis-auth-secret.sh`. Bootstrap the controllers,
    apply both Argo CD Applications, and capture Synced/Healthy status. Do not
    treat a live patch as desired state.
 3. After initial, rollback, and restored reconciliation, run
@@ -160,7 +160,7 @@ Never mark an unexecuted or failed capability as passed.
 ## Evidence summaries
 
 Do not create an empty evidence template. Each run adds one concise, dated
-`evidence/aks-validation-YYYY-MM-DD.json` summary only after field-by-field
+`targets/aks/evidence/validation-YYYY-MM-DD.json` summary only after field-by-field
 sanitization. A future summary must contain:
 
 - a schema version, run date, and final `passed` or `failed` status;

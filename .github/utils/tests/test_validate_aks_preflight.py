@@ -11,7 +11,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from validate_aks_preflight import (  # noqa: E402
     AksPreflightError,
-    SkuCapacity,
     load_target_facts,
     validate_kubernetes_version,
     validate_quota,
@@ -39,7 +38,9 @@ SKU = {
     ]
 }
 
-CAPACITY = SkuCapacity(quota_family="StandardDlsv6Family", vcpus_per_node=4)
+QUOTA_FAMILY = "StandardDlsv6Family"
+VCPUS_PER_NODE = 4
+CAPACITY = (QUOTA_FAMILY, VCPUS_PER_NODE)
 
 
 class ValidateAksPreflightTest(unittest.TestCase):
@@ -55,7 +56,8 @@ class ValidateAksPreflightTest(unittest.TestCase):
                 {"name": {"value": "StandardDlsv6Family"}, "currentValue": 0, "limit": 8},
             ],
             TARGET,
-            CAPACITY,
+            quota_family=QUOTA_FAMILY,
+            vcpus_per_node=VCPUS_PER_NODE,
         )
         validate_kubernetes_version(
             {"values": [{"version": "1.35", "patchVersions": {"1.35.5": {}}}]},
@@ -64,7 +66,7 @@ class ValidateAksPreflightTest(unittest.TestCase):
         )
 
     def test_loads_target_facts_from_terraform_native_configuration(self) -> None:
-        target_path = Path(__file__).resolve().parents[3] / "terraform/aks/target.tf.json"
+        target_path = Path(__file__).resolve().parents[3] / "targets/aks/terraform/target.tf.json"
         self.assertEqual(load_target_facts(target_path), TARGET)
 
     def test_rejects_target_fact_contract_drift(self) -> None:
@@ -121,7 +123,8 @@ class ValidateAksPreflightTest(unittest.TestCase):
                     {"name": {"value": "StandardDlsv6Family"}, "currentValue": 1, "limit": 8},
                 ],
                 TARGET,
-                CAPACITY,
+                quota_family=QUOTA_FAMILY,
+                vcpus_per_node=VCPUS_PER_NODE,
             )
 
     def test_rejects_unavailable_kubernetes_patch(self) -> None:
