@@ -1,13 +1,11 @@
 import json
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from validate_paired_release_manifest import (  # noqa: E402
     PairedReleaseManifestError,
-    validate_file_to_output,
     validate_paired_release_manifest,
     validate_release_evidence,
 )
@@ -28,13 +26,6 @@ class PairedReleaseManifestTest(unittest.TestCase):
         validated = validate_release_evidence(manifest(), expected_tag="v1.2.3")
         self.assertEqual(validated["web_repository"], "ghcr.io/optiplex331/halligalli-bossyang-web")
         self.assertEqual(validated["api_digest"], "sha256:" + "c" * 64)
-
-    def test_writes_validated_candidate_file(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            manifest_path, output_path = Path(directory) / "paired-release-manifest.json", Path(directory) / "candidate.json"
-            manifest_path.write_text(json.dumps(manifest()))
-            validated = validate_file_to_output(manifest_path, expected_tag="v1.2.3", output_path=output_path)
-            self.assertEqual(json.loads(output_path.read_text()), validated)
 
     def test_rejects_malformed_or_partial_manifest(self) -> None:
         partial = manifest(); del partial["images"]["api"]

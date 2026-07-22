@@ -6,17 +6,24 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 
 VERSION_RE = re.compile(r"^1\.[0-9]{2}\.[0-9]+$")
 BACKEND_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
-TARGET_KEYS = {"region", "nodeSku", "nodeCount", "vcpusPerNode", "quotaFamily"}
+TARGET_KEYS = {"region", "nodeSku", "nodeCount"}
 
 
 class AksPreflightError(ValueError):
     """Raised when an AKS preflight input is not safe to use."""
+
+
+@dataclass(frozen=True)
+class SkuCapacity:
+    quota_family: str
+    vcpus_per_node: int
 
 
 def load_object(path: Path) -> dict[str, Any]:
@@ -54,12 +61,11 @@ def load_target_facts(path: Path) -> dict[str, Any]:
         raise AksPreflightError("AKS Terraform target facts must be an object.")
     _require_exact_keys(target, TARGET_KEYS, "AKS Terraform target facts")
 
-    for key in ("region", "nodeSku", "quotaFamily"):
+    for key in ("region", "nodeSku"):
         if not isinstance(target[key], str) or not target[key]:
             raise AksPreflightError(f"AKS Terraform target {key} must be a non-empty string.")
-    for key in ("nodeCount", "vcpusPerNode"):
-        if not isinstance(target[key], int) or isinstance(target[key], bool) or target[key] < 1:
-            raise AksPreflightError(f"AKS Terraform target {key} must be a positive integer.")
+    if not isinstance(target["nodeCount"], int) or isinstance(target["nodeCount"], bool) or target["nodeCount"] < 1:
+        raise AksPreflightError("AKS Terraform target nodeCount must be a positive integer.")
     return target
 
 
@@ -71,7 +77,7 @@ def validate_subscription(account: dict[str, Any], expected_id: str) -> dict[str
     return {"id": expected_id, "name": str(account.get("name", ""))}
 
 
-def validate_sku(payload: dict[str, Any], target: dict[str, Any]) -> None:
+def validate_sku(payload: dict[str, Any], target: dict[str, Any]) -> SkuCapacity:
     values = payload.get("value")
     if not isinstance(values, list):
         raise AksPreflightError("Azure Resource SKU data does not contain a value list.")
@@ -92,10 +98,9 @@ def validate_sku(payload: dict[str, Any], target: dict[str, Any]) -> None:
         raise AksPreflightError(
             f"{target['nodeSku']} is restricted for the selected subscription in {target['region']}."
         )
-    if matches[0].get("family") != target["quotaFamily"]:
-        raise AksPreflightError(
-            f"{target['nodeSku']} does not belong to target quota family {target['quotaFamily']}."
-        )
+    quota_family = matches[0].get("family")
+    if not isinstance(quota_family, str) or not quota_family:
+        raise AksPreflightError(f"{target['nodeSku']} does not report a quota family.")
     capabilities = matches[0].get("capabilities")
     if not isinstance(capabilities, list):
         raise AksPreflightError(f"{target['nodeSku']} does not report SKU capabilities.")
@@ -104,13 +109,18 @@ def validate_sku(payload: dict[str, Any], target: dict[str, Any]) -> None:
         for item in capabilities
         if isinstance(item, dict) and item.get("name") == "vCPUs"
     ]
-    if len(vcpu_values) != 1 or str(vcpu_values[0]) != str(target["vcpusPerNode"]):
-        raise AksPreflightError(
-            f"{target['nodeSku']} does not report target vcpusPerNode {target['vcpusPerNode']}."
-        )
+    if len(vcpu_values) != 1:
+        raise AksPreflightError(f"{target['nodeSku']} does not report exactly one vCPU capacity.")
+    try:
+        vcpus_per_node = int(vcpu_values[0])
+    except (TypeError, ValueError) as error:
+        raise AksPreflightError(f"{target['nodeSku']} reports an invalid vCPU capacity.") from error
+    if vcpus_per_node < 1:
+        raise AksPreflightError(f"{target['nodeSku']} reports an invalid vCPU capacity.")
+    return SkuCapacity(quota_family=quota_family, vcpus_per_node=vcpus_per_node)
 
 
-def validate_quota(payload: list[Any], target: dict[str, Any]) -> None:
+def validate_quota(payload: list[Any], target: dict[str, Any], capacity: SkuCapacity) -> None:
     usage: dict[str, tuple[int, int]] = {}
     for item in payload:
         if not isinstance(item, dict) or not isinstance(item.get("name"), dict):
@@ -121,8 +131,8 @@ def validate_quota(payload: list[Any], target: dict[str, Any]) -> None:
                 usage[name] = (int(item.get("currentValue", 0)), int(item.get("limit", 0)))
             except (TypeError, ValueError) as error:
                 raise AksPreflightError(f"Azure quota {name} has invalid usage values.") from error
-    required_vcpus = target["nodeCount"] * target["vcpusPerNode"]
-    for name in ("cores", target["quotaFamily"]):
+    required_vcpus = target["nodeCount"] * capacity.vcpus_per_node
+    for name in ("cores", capacity.quota_family):
         if name not in usage:
             raise AksPreflightError(f"Required Azure quota {name} was not returned.")
         current, limit = usage[name]
@@ -132,28 +142,23 @@ def validate_quota(payload: list[Any], target: dict[str, Any]) -> None:
             )
 
 
-def _strings(value: Any) -> set[str]:
-    if isinstance(value, str):
-        return {value}
-    if isinstance(value, list):
-        result: set[str] = set()
-        for item in value:
-            result.update(_strings(item))
-        return result
-    if isinstance(value, dict):
-        result = {key for key in value if isinstance(key, str)}
-        for item in value.values():
-            result.update(_strings(item))
-        return result
-    return set()
-
-
 def validate_kubernetes_version(
     payload: dict[str, Any], target_version: str, target: dict[str, Any]
 ) -> None:
     if not VERSION_RE.fullmatch(target_version):
         raise AksPreflightError("Kubernetes version must be a full version such as 1.35.5.")
-    if target_version not in _strings(payload):
+    values = payload.get("values")
+    if not isinstance(values, list):
+        raise AksPreflightError("Azure Kubernetes version data does not contain a value list.")
+    offered_patches: set[str] = set()
+    for version in values:
+        if not isinstance(version, dict) or not isinstance(version.get("version"), str):
+            raise AksPreflightError("Azure Kubernetes version entry is malformed.")
+        patch_versions = version.get("patchVersions")
+        if not isinstance(patch_versions, dict):
+            raise AksPreflightError("Azure Kubernetes version entry is malformed.")
+        offered_patches.update(patch for patch in patch_versions if isinstance(patch, str))
+    if target_version not in offered_patches:
         raise AksPreflightError(
             f"Kubernetes {target_version} is not offered in {target['region']}."
         )
@@ -187,7 +192,7 @@ def main() -> None:
     target_field = subparsers.add_parser("target-field")
     target_field.add_argument("--terraform-target", type=Path, required=True)
     target_field.add_argument(
-        "--name", choices=("region", "nodeSku", "nodeCount", "vcpusPerNode", "quotaFamily"), required=True
+        "--name", choices=("region", "nodeSku", "nodeCount"), required=True
     )
 
     validate = subparsers.add_parser("validate")
@@ -209,8 +214,8 @@ def main() -> None:
         return
 
     subscription = validate_subscription(load_object(args.subscription), args.expected_subscription)
-    validate_sku(load_object(args.resource_skus), target)
-    validate_quota(load_array(args.quota), target)
+    capacity = validate_sku(load_object(args.resource_skus), target)
+    validate_quota(load_array(args.quota), target, capacity)
     validate_kubernetes_version(load_object(args.aks_versions), args.kubernetes_version, target)
     write_backend_config(args.backend_output, args.terraform_organization, args.terraform_workspace)
     print(
@@ -220,7 +225,7 @@ def main() -> None:
                 "region": target["region"],
                 "nodeSku": target["nodeSku"],
                 "nodeCount": target["nodeCount"],
-                "requiredVcpus": target["nodeCount"] * target["vcpusPerNode"],
+                "requiredVcpus": target["nodeCount"] * capacity.vcpus_per_node,
                 "kubernetesVersion": args.kubernetes_version,
             },
             indent=2,

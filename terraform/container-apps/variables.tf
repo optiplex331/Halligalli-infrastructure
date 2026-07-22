@@ -18,14 +18,3 @@ variable "container_app_name" {
   type    = string
   default = "halligalli-live-demo"
 }
-
-variable "monthly_budget_target_usd" {
-  type        = number
-  default     = 25
-  description = "Monthly operating budget target in USD; notification wiring is configured separately."
-
-  validation {
-    condition     = var.monthly_budget_target_usd == 25
-    error_message = "The initial Live Demo monthly budget target must remain USD 25 until deliberately reviewed."
-  }
-}
