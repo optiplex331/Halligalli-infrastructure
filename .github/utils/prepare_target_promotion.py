@@ -8,7 +8,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-PRODUCT_REPOSITORY = "optiplex331/Halligalli-BossYang"
 TAG_RE = re.compile(r"^v[0-9]+\.[0-9]+\.[0-9]+$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -82,18 +81,15 @@ def _validate_release_evidence(manifest: Any, expected_tag: str) -> dict[str, st
     return candidate
 
 
-def resolve_promotion_request(target_name: str, release_tag: str) -> dict[str, str]:
+def _promotion_request(target_name: str, release_tag: str) -> dict[str, str]:
     target = TARGETS.get(target_name)
     if target is None:
         raise PromotionError(f"target must be one of: {', '.join(TARGETS)}")
     if not TAG_RE.fullmatch(release_tag):
         raise PromotionError("release_tag must match vX.Y.Z")
     return {
-        "target": target_name,
-        "release_tag": release_tag,
         "desired_state_path": target["desired_state_path"],
         "promotion_branch": target["promotion_branch"],
-        "asset_url": f"https://github.com/{PRODUCT_REPOSITORY}/releases/download/{release_tag}/paired-release-manifest.json",
         "commit_message": f"chore({target['commit_scope']}): promote Halligalli {release_tag}",
     }
 
@@ -143,10 +139,14 @@ Review whether this release should be deployed to the {target["display_name"]} a
 """
 
 
-def prepare_promotion(
-    *, target_name: str, release_tag: str, manifest: Any, desired_state: Any
+def _prepare_resolved_promotion(
+    *,
+    request: dict[str, str],
+    target_name: str,
+    release_tag: str,
+    manifest: Any,
+    desired_state: Any,
 ) -> dict[str, Any]:
-    resolve_promotion_request(target_name, release_tag)
     candidate = _validate_release_evidence(manifest, release_tag)
     promoted = _build_target_promotion(target_name, desired_state, candidate)
     return {
@@ -157,10 +157,27 @@ def prepare_promotion(
             candidate=candidate,
         ),
         "outputs": {
-            **candidate,
+            **request,
+            "commit": candidate["commit"],
+            "web_repository": candidate["web_repository"],
+            "web_digest": candidate["web_digest"],
+            "api_repository": candidate["api_repository"],
+            "api_digest": candidate["api_digest"],
             "promotion_required": "true" if promoted != desired_state else "false",
         },
     }
+
+
+def prepare_promotion(
+    *, target_name: str, release_tag: str, manifest: Any, desired_state: Any
+) -> dict[str, Any]:
+    return _prepare_resolved_promotion(
+        request=_promotion_request(target_name, release_tag),
+        target_name=target_name,
+        release_tag=release_tag,
+        manifest=manifest,
+        desired_state=desired_state,
+    )
 
 
 def write_outputs(values: dict[str, str]) -> None:
@@ -173,41 +190,30 @@ def write_outputs(values: dict[str, str]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    resolve = subparsers.add_parser("resolve")
-    resolve.add_argument("--target", required=True)
-    resolve.add_argument("--release-tag", required=True)
-    prepare = subparsers.add_parser("prepare")
-    prepare.add_argument("--target", required=True)
-    prepare.add_argument("--release-tag", required=True)
-    prepare.add_argument("--manifest", type=Path, required=True)
-    prepare.add_argument("--repo-root", type=Path, default=Path("."))
-    prepare.add_argument("--output", type=Path, required=True)
-    prepare.add_argument("--pr-body-output", type=Path, required=True)
+    parser.add_argument("--target", required=True)
+    parser.add_argument("--release-tag", required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--repo-root", type=Path, default=Path("."))
+    parser.add_argument("--pr-body-output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        if args.command == "resolve":
-            result = resolve_promotion_request(args.target, args.release_tag)
-            write_outputs(result)
-        else:
-            target = resolve_promotion_request(args.target, args.release_tag)
-            promotion = prepare_promotion(
-                target_name=args.target,
-                release_tag=args.release_tag,
-                manifest=json.loads(args.manifest.read_text(encoding="utf-8")),
-                desired_state=json.loads(
-                    (args.repo_root / target["desired_state_path"]).read_text(
-                        encoding="utf-8"
-                    )
-                ),
-            )
-            args.output.write_text(
+        request = _promotion_request(args.target, args.release_tag)
+        desired_state_path = args.repo_root / request["desired_state_path"]
+        promotion = _prepare_resolved_promotion(
+            request=request,
+            target_name=args.target,
+            release_tag=args.release_tag,
+            manifest=json.loads(args.manifest.read_text(encoding="utf-8")),
+            desired_state=json.loads(desired_state_path.read_text(encoding="utf-8")),
+        )
+        if promotion["outputs"]["promotion_required"] == "true":
+            desired_state_path.write_text(
                 json.dumps(promotion["desired_state"], indent=2) + "\n",
                 encoding="utf-8",
             )
-            args.pr_body_output.write_text(promotion["pr_body"], encoding="utf-8")
-            result = promotion["outputs"]
-            write_outputs(result)
+        args.pr_body_output.write_text(promotion["pr_body"], encoding="utf-8")
+        result = promotion["outputs"]
+        write_outputs(result)
         print(json.dumps(result, sort_keys=True))
     except (json.JSONDecodeError, OSError, PromotionError) as error:
         parser.exit(1, f"{error}\n")

@@ -32,80 +32,56 @@ jobs:
           fetch-depth: 0
           ref: main
 
-      - name: Resolve closed target and formal release
-        id: request
-        env:
-          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
-          REQUESTED_TARGET: ${{ inputs.target }}
-        run: >-
-          python3 .github/utils/prepare_target_promotion.py resolve
-          --target "${REQUESTED_TARGET}"
-          --release-tag "${REQUESTED_RELEASE_TAG}"
-
       - name: Download public Paired Release Manifest
         env:
-          ASSET_URL: ${{ steps.request.outputs.asset_url }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: >-
           curl --fail --location --silent --show-error
-          "${ASSET_URL}" --output paired-release-manifest.json
+          "https://github.com/${PRODUCT_REPOSITORY}/releases/download/${RELEASE_TAG}/paired-release-manifest.json"
+          --output paired-release-manifest.json
 
       - name: Prepare target-scoped Deployment Desired State and evidence
         id: promotion
         env:
-          RELEASE_TAG: ${{ steps.request.outputs.release_tag }}
-          TARGET: ${{ steps.request.outputs.target }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          TARGET: ${{ inputs.target }}
         run: >-
-          python3 .github/utils/prepare_target_promotion.py prepare
+          python3 .github/utils/prepare_target_promotion.py
           --target "${TARGET}"
           --release-tag "${RELEASE_TAG}"
           --manifest paired-release-manifest.json
-          --output promoted-desired-state.json
           --pr-body-output /tmp/promotion-pr.md
 
-      - name: Verify Web artifact provenance
-        if: steps.promotion.outputs.promotion_required == 'true'
-        env:
-          RELEASE_TAG: ${{ steps.request.outputs.release_tag }}
-        run: >-
-          gh attestation verify "oci://${{ steps.promotion.outputs.web_repository }}@${{ steps.promotion.outputs.web_digest }}"
-          --repo "${PRODUCT_REPOSITORY}"
-          --signer-workflow "${PRODUCT_REPOSITORY}/.github/workflows/container.yml"
-          --source-ref "refs/tags/${RELEASE_TAG}"
-          --source-digest "${{ steps.promotion.outputs.commit }}"
-          --deny-self-hosted-runners
-
-      - name: Verify API artifact provenance
-        if: steps.promotion.outputs.promotion_required == 'true'
-        env:
-          RELEASE_TAG: ${{ steps.request.outputs.release_tag }}
-        run: >-
-          gh attestation verify "oci://${{ steps.promotion.outputs.api_repository }}@${{ steps.promotion.outputs.api_digest }}"
-          --repo "${PRODUCT_REPOSITORY}"
-          --signer-workflow "${PRODUCT_REPOSITORY}/.github/workflows/container.yml"
-          --source-ref "refs/tags/${RELEASE_TAG}"
-          --source-digest "${{ steps.promotion.outputs.commit }}"
-          --deny-self-hosted-runners
-
-      - name: Apply target-scoped desired state
+      - name: Verify paired artifact provenance
         if: steps.promotion.outputs.promotion_required == 'true'
         shell: bash
         env:
-          DESIRED_STATE_PATH: ${{ steps.request.outputs.desired_state_path }}
+          API_IMAGE: ${{ steps.promotion.outputs.api_repository }}@${{ steps.promotion.outputs.api_digest }}
+          COMMIT: ${{ steps.promotion.outputs.commit }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          WEB_IMAGE: ${{ steps.promotion.outputs.web_repository }}@${{ steps.promotion.outputs.web_digest }}
         run: |
           set -euo pipefail
-          cp promoted-desired-state.json "${DESIRED_STATE_PATH}"
+          for image in "${WEB_IMAGE}" "${API_IMAGE}"; do
+            gh attestation verify "oci://${image}" \
+              --repo "${PRODUCT_REPOSITORY}" \
+              --signer-workflow "${PRODUCT_REPOSITORY}/.github/workflows/container.yml" \
+              --source-ref "refs/tags/${RELEASE_TAG}" \
+              --source-digest "${COMMIT}" \
+              --deny-self-hosted-runners
+          done
 
       - name: Create or update Draft target promotion PR
         if: steps.promotion.outputs.promotion_required == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ github.token }}
-          branch: ${{ steps.request.outputs.promotion_branch }}
+          branch: ${{ steps.promotion.outputs.promotion_branch }}
           base: main
-          add-paths: ${{ steps.request.outputs.desired_state_path }}
-          commit-message: ${{ steps.request.outputs.commit_message }}
+          add-paths: ${{ steps.promotion.outputs.desired_state_path }}
+          commit-message: ${{ steps.promotion.outputs.commit_message }}
           committer: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
           author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
-          title: ${{ steps.request.outputs.commit_message }}
+          title: ${{ steps.promotion.outputs.commit_message }}
           body-path: /tmp/promotion-pr.md
           draft: always-true
