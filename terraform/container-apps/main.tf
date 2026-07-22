@@ -157,8 +157,3 @@ resource "azurerm_container_app" "live_demo" {
 output "live_demo_hostname" {
   value = azurerm_container_app.live_demo.ingress[0].fqdn
 }
-
-output "monthly_budget_target_usd" {
-  value       = var.monthly_budget_target_usd
-  description = "Operating target only; Azure budget alerts require separately approved notification recipients."
-}

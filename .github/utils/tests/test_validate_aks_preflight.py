@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from validate_aks_preflight import (  # noqa: E402
     AksPreflightError,
+    SkuCapacity,
     load_target_facts,
     validate_kubernetes_version,
     validate_quota,
@@ -24,9 +25,21 @@ TARGET = {
     "region": "westeurope",
     "nodeSku": "Standard_D4ls_v6",
     "nodeCount": 2,
-    "vcpusPerNode": 4,
-    "quotaFamily": "StandardDlsv6Family",
 }
+
+SKU = {
+    "value": [
+        {
+            "name": "Standard_D4ls_v6",
+            "locations": ["westeurope"],
+            "restrictions": [],
+            "family": "StandardDlsv6Family",
+            "capabilities": [{"name": "vCPUs", "value": "4"}],
+        }
+    ]
+}
+
+CAPACITY = SkuCapacity(quota_family="StandardDlsv6Family", vcpus_per_node=4)
 
 
 class ValidateAksPreflightTest(unittest.TestCase):
@@ -35,22 +48,14 @@ class ValidateAksPreflightTest(unittest.TestCase):
             validate_subscription({"id": "expected", "name": "Demo", "state": "Enabled"}, "expected"),
             {"id": "expected", "name": "Demo"},
         )
-        validate_sku(
-            {"value": [{
-                "name": "Standard_D4ls_v6",
-                "locations": ["westeurope"],
-                "restrictions": [],
-                "family": "StandardDlsv6Family",
-                "capabilities": [{"name": "vCPUs", "value": "4"}],
-            }]},
-            TARGET,
-        )
+        self.assertEqual(validate_sku(SKU, TARGET), CAPACITY)
         validate_quota(
             [
                 {"name": {"value": "cores"}, "currentValue": 2, "limit": 20},
                 {"name": {"value": "StandardDlsv6Family"}, "currentValue": 0, "limit": 8},
             ],
             TARGET,
+            CAPACITY,
         )
         validate_kubernetes_version(
             {"values": [{"version": "1.35", "patchVersions": {"1.35.5": {}}}]},
@@ -67,8 +72,7 @@ class ValidateAksPreflightTest(unittest.TestCase):
             path = Path(directory) / "target.tf.json"
             path.write_text(
                 '{"locals":{"aks_target":{"region":"westeurope",'
-                '"nodeSku":"Standard_D4ls_v6","nodeCount":2,"vcpusPerNode":4,'
-                '"quotaFamily":"StandardDlsv6Family","requiredVcpus":8}}}',
+                '"nodeSku":"Standard_D4ls_v6","nodeCount":2,"requiredVcpus":8}}}',
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(AksPreflightError, "unsupported requiredVcpus"):
@@ -78,13 +82,17 @@ class ValidateAksPreflightTest(unittest.TestCase):
         changed_target = {**TARGET, "nodeSku": "Standard_D2ls_v6"}
         with self.assertRaisesRegex(AksPreflightError, "Standard_D2ls_v6"):
             validate_sku(
-                {"value": [{
-                    "name": "Standard_D4ls_v6",
-                    "locations": ["westeurope"],
-                    "restrictions": [],
-                    "family": "StandardDlsv6Family",
-                    "capabilities": [{"name": "vCPUs", "value": "4"}],
-                }]},
+                {
+                    "value": [
+                        {
+                            "name": "Standard_D4ls_v6",
+                            "locations": ["westeurope"],
+                            "restrictions": [],
+                            "family": "StandardDlsv6Family",
+                            "capabilities": [{"name": "vCPUs", "value": "4"}],
+                        }
+                    ]
+                },
                 changed_target,
             )
 
@@ -105,20 +113,6 @@ class ValidateAksPreflightTest(unittest.TestCase):
                 TARGET,
             )
 
-    def test_rejects_node_shape_metadata_that_disagrees_with_azure_sku(self) -> None:
-        changed_target = {**TARGET, "vcpusPerNode": 8}
-        with self.assertRaisesRegex(AksPreflightError, "target vcpusPerNode 8"):
-            validate_sku(
-                {"value": [{
-                    "name": "Standard_D4ls_v6",
-                    "locations": ["westeurope"],
-                    "restrictions": [],
-                    "family": "StandardDlsv6Family",
-                    "capabilities": [{"name": "vCPUs", "value": "4"}],
-                }]},
-                changed_target,
-            )
-
     def test_rejects_insufficient_family_quota(self) -> None:
         with self.assertRaisesRegex(AksPreflightError, "fewer than 8"):
             validate_quota(
@@ -127,12 +121,38 @@ class ValidateAksPreflightTest(unittest.TestCase):
                     {"name": {"value": "StandardDlsv6Family"}, "currentValue": 1, "limit": 8},
                 ],
                 TARGET,
+                CAPACITY,
             )
 
     def test_rejects_unavailable_kubernetes_patch(self) -> None:
         with self.assertRaisesRegex(AksPreflightError, "not offered"):
             validate_kubernetes_version(
-                {"values": [{"version": "1.35.4"}]}, "1.35.5", TARGET
+                {"values": [{"version": "1.35", "patchVersions": {}}]}, "1.35.5", TARGET
+            )
+
+    def test_rejects_patch_found_only_in_an_unrelated_field(self) -> None:
+        with self.assertRaisesRegex(AksPreflightError, "not offered"):
+            validate_kubernetes_version(
+                {"note": "1.35.5", "values": [{"version": "1.35", "patchVersions": {}}]},
+                "1.35.5",
+                TARGET,
+            )
+
+    def test_rejects_malformed_kubernetes_version_response(self) -> None:
+        with self.assertRaisesRegex(AksPreflightError, "value list"):
+            validate_kubernetes_version({}, "1.35.5", TARGET)
+
+    def test_rejects_malformed_kubernetes_version_entry(self) -> None:
+        with self.assertRaisesRegex(AksPreflightError, "entry is malformed"):
+            validate_kubernetes_version(
+                {
+                    "values": [
+                        {"version": "1.35", "patchVersions": {"1.35.5": {}}},
+                        {"version": "1.36", "patchVersions": []},
+                    ]
+                },
+                "1.35.5",
+                TARGET,
             )
 
     def test_writes_backend_config_for_the_selected_workspace(self) -> None:

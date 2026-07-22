@@ -3,9 +3,7 @@
     "aks_target": {
       "region": "westeurope",
       "nodeSku": "Standard_D4ls_v6",
-      "nodeCount": 2,
-      "vcpusPerNode": 4,
-      "quotaFamily": "StandardDlsv6Family"
+      "nodeCount": 2
     }
   }
 }
