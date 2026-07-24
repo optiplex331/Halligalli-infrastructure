@@ -1,5 +1,10 @@
 locals {
-  desired_state = jsondecode(file("${path.root}/../desired-state.json"))
+  location                       = "northeurope"
+  resource_group_name            = "halligalli-container-apps"
+  container_app_environment_name = "halligalli-live-demo-env"
+  container_app_name             = "halligalli-live-demo"
+
+  desired_state = jsondecode(file("${path.root}/desired-state.json"))
 
   web_repository   = try(local.desired_state.webImage.repository, "")
   web_digest       = try(local.desired_state.webImage.digest, "")
@@ -25,18 +30,18 @@ locals {
 }
 
 resource "azurerm_resource_group" "live_demo" {
-  name     = var.resource_group_name
-  location = var.resource_group_location
+  name     = local.resource_group_name
+  location = local.location
 }
 
 resource "azurerm_container_app_environment" "live_demo" {
-  name                = "halligalli-live-demo"
-  location            = var.location
+  name                = local.container_app_environment_name
+  location            = local.location
   resource_group_name = azurerm_resource_group.live_demo.name
 }
 
 resource "azurerm_container_app" "live_demo" {
-  name                         = var.container_app_name
+  name                         = local.container_app_name
   container_app_environment_id = azurerm_container_app_environment.live_demo.id
   resource_group_name          = azurerm_resource_group.live_demo.name
   revision_mode                = "Single"

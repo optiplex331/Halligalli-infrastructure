@@ -3,7 +3,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
   location            = local.aks_target.region
   resource_group_name = azurerm_resource_group.aks.name
   dns_prefix          = "halligalli-aks"
-  kubernetes_version  = var.kubernetes_version
+  kubernetes_version  = local.aks_target.kubernetesVersion
   node_resource_group = "halligalli-aks-nodes-rg"
   sku_tier            = "Free"
 

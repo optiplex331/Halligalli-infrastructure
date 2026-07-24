@@ -8,8 +8,14 @@ One Azure Container App contains separate Web, API, and ephemeral Redis
 containers sharing localhost networking. Terraform owns the exact region,
 resource names, resource allocations, scaling limits, images, ingress, and
 platform probes; do not copy those values into operator notes. The checked-in
-Deployment Desired State owns the complete release selection, and the Terraform
-root consumes it directly.
+Deployment Desired State owns the runtime image selection, and the Terraform
+root consumes it directly. Release tag, commit, and provenance remain in the
+Promotion PR rather than being duplicated in this runtime file.
+
+The Terraform `local.location` value is the single region setting for this
+target. It sets both the Terraform-managed resource group and the Container
+Apps environment; the target does not expose a separate resource-group
+metadata region or supported Terraform input variables.
 
 Creating the DNS validation records, managed certificate, and `play.halligalli.games` binding is a separately approved bootstrap operation. AzureRM exposes the app's custom-domain collection as read-only, so this repository does not pretend that Terraform owns that binding or hide it behind deployment.
 
@@ -34,11 +40,10 @@ az containerapp hostname bind \
   --certificate '<managed certificate name>'
 ```
 
-Keep the backend config and `terraform.tfvars` local; neither contains
-application secrets, but both identify the Azure account. If an existing
-`terraform.tfvars` still declares `web_image`, `api_image`, or `redis_image`,
-remove those obsolete entries; release images come only from the checked-in
-Deployment Desired State.
+Keep the backend config local; it identifies the Azure account. This root has no
+supported `terraform.tfvars` inputs. Remove any stale `terraform.tfvars` entries
+for resource names, location, or release images; release images come only from
+the checked-in Deployment Desired State.
 
 ## Promotion and deployment
 
@@ -78,24 +83,24 @@ This repository does not store `AZURE_CREDENTIALS`, a user refresh token, a serv
 
 ## Rollback
 
-Rollback restores a complete previously reviewed Paired Release in source control. Revert the promotion commit that changed `targets/container-apps/desired-state.json`, review and merge that revert, then create and review a new Terraform plan from the resulting `main`. Apply that saved plan and run the same immediate public smoke command above. The revert must restore release version, commit, Web digest, and API digest together; editing or rolling back only one release image is invalid.
+Rollback restores the previously reviewed runtime state in source control. Revert the promotion commit that changed `targets/container-apps/desired-state.json`, review and merge that revert, then create and review a new Terraform plan from the resulting `main`. Apply that saved plan and run the same immediate public smoke command above. Web and API digests must be restored together; editing or rolling back only one product image is invalid.
 
 Single revision delivery does not retain manual traffic weights or provide an immediate traffic-flip rollback. If a new revision fails platform readiness, Azure leaves traffic on the previous ready revision. If a revision passes readiness but fails the public smoke, restore the previous complete pair through Git review and another approved Terraform apply.
 
 ## Monitoring and readiness
 
-`Monitor Live Demo` runs a read-only public HTTPS and WebSocket uptime check
-once daily and may also be dispatched manually. The workflow owns its exact
+`Monitor Live Demo` runs a read-only public HTTPS and WebSocket uptime check every
+three days and may also be dispatched manually. The workflow owns its exact
 schedule. Either check failing
 fails the workflow directly; the repository does not create or maintain a
 GitHub Issue incident for uptime failures.
 
-The daily check is a basic public availability signal, not a deployment gate.
+The scheduled check is a basic public availability signal, not a deployment gate.
 Terraform declares HTTP startup and readiness probes for Web, an API startup
 probe plus `/internal/ready` readiness (which checks Redis), and TCP startup and
 readiness probes for Redis. Platform readiness determines whether a revision
 may receive traffic. The operator then runs the same read-only public smoke
 immediately after an approved deployment apply; this establishes external
-HTTPS and WebSocket behavior without waiting for the next daily uptime run.
+HTTPS and WebSocket behavior without waiting for the next scheduled uptime run.
 
 No command in this runbook authorizes Azure, DNS, or GitHub Environment mutation. Bootstrap and live recovery require separate explicit approval.

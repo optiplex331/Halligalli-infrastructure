@@ -10,23 +10,26 @@ operation_config="$repo_root/targets/aks/terraform/local-operation.env"
   exit 1
 }
 
-set -a
 # shellcheck disable=SC1090
 . "$operation_config"
-set +a
 
 [ "${HALLIGALLI_OPERATION_APPROVED:-}" = "1" ] || {
   echo "Refusing Azure preflight without HALLIGALLI_OPERATION_APPROVED=1 in the local operation configuration." >&2
   exit 1
 }
 
-for name in AZURE_SUBSCRIPTION_ID HCP_TERRAFORM_ORGANIZATION HCP_TERRAFORM_WORKSPACE HALLIGALLI_AKS_KUBERNETES_VERSION; do
-  eval "value=\${$name:-}"
-  [ -n "$value" ] || {
-    echo "Set $name in targets/aks/terraform/local-operation.env." >&2
-    exit 1
-  }
-done
+[ -n "${AZURE_SUBSCRIPTION_ID:-}" ] || {
+  echo "Set AZURE_SUBSCRIPTION_ID in targets/aks/terraform/local-operation.env." >&2
+  exit 1
+}
+[ -n "${HCP_TERRAFORM_ORGANIZATION:-}" ] || {
+  echo "Set HCP_TERRAFORM_ORGANIZATION in targets/aks/terraform/local-operation.env." >&2
+  exit 1
+}
+[ -n "${HCP_TERRAFORM_WORKSPACE:-}" ] || {
+  echo "Set HCP_TERRAFORM_WORKSPACE in targets/aks/terraform/local-operation.env." >&2
+  exit 1
+}
 
 for command in az terraform python3; do
   command -v "$command" >/dev/null 2>&1 || {
@@ -36,10 +39,10 @@ for command in az terraform python3; do
 done
 
 terraform_root="$repo_root/targets/aks/terraform"
-terraform_target="$terraform_root/target.tf.json"
+target_facts="$terraform_root/target.json"
 output_dir="${HALLIGALLI_AKS_PREFLIGHT_OUTPUT:-$repo_root/.local/aks-preflight}"
 region="$(python3 "$repo_root/.github/utils/validate_aks_preflight.py" target-field \
-  --terraform-target "$terraform_target" --name region)"
+  --target-facts "$target_facts" --name region)"
 export ARM_SUBSCRIPTION_ID="$AZURE_SUBSCRIPTION_ID"
 
 mkdir -p "$output_dir"
@@ -55,9 +58,8 @@ az aks get-versions --subscription "$AZURE_SUBSCRIPTION_ID" \
   --location "$region" -o json > "$output_dir/aks-versions.json"
 
 python3 "$repo_root/.github/utils/validate_aks_preflight.py" validate \
-  --terraform-target "$terraform_target" \
+  --target-facts "$target_facts" \
   --expected-subscription "$AZURE_SUBSCRIPTION_ID" \
-  --kubernetes-version "$HALLIGALLI_AKS_KUBERNETES_VERSION" \
   --subscription "$output_dir/subscription.json" \
   --resource-skus "$output_dir/resource-skus.json" \
   --quota "$output_dir/quota.json" \
@@ -70,7 +72,6 @@ python3 "$repo_root/.github/utils/validate_aks_preflight.py" validate \
 terraform -chdir="$terraform_root" init \
   -backend-config="$output_dir/backend.hcl" -input=false
 terraform -chdir="$terraform_root" plan -no-color -input=false \
-  -var="kubernetes_version=$HALLIGALLI_AKS_KUBERNETES_VERSION" \
   -out="$output_dir/create.tfplan" > "$output_dir/create-plan.txt"
 terraform -chdir="$terraform_root" show -json "$output_dir/create.tfplan" \
   > "$output_dir/create-plan.json"

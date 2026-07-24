@@ -40,8 +40,8 @@ terraform -chdir=targets/container-apps/terraform validate -no-color
 terraform -chdir=targets/aks/terraform fmt -check -recursive
 terraform -chdir=targets/aks/terraform init -backend=false -input=false
 terraform -chdir=targets/aks/terraform validate -no-color
-helm lint targets/aks/gitops/charts/halligalli --values targets/aks/gitops/values/halligalli.values.json
-helm lint targets/aks/gitops/charts/halligalli-observability --values targets/aks/gitops/values/halligalli-observability.values.json
+helm lint targets/aks/gitops/charts/halligalli --values targets/aks/gitops/charts/halligalli/values/aks.values.json
+helm lint targets/aks/gitops/observability --values targets/aks/gitops/observability/values/aks.values.json
 ```
 
 These commands are static validation only. Never use a cloud apply as validation.

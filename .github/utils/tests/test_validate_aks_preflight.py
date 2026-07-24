@@ -21,16 +21,17 @@ from validate_aks_preflight import (  # noqa: E402
 
 
 TARGET = {
-    "region": "westeurope",
+    "region": "northeurope",
     "nodeSku": "Standard_D4ls_v6",
     "nodeCount": 2,
+    "kubernetesVersion": "1.36.1",
 }
 
 SKU = {
     "value": [
         {
             "name": "Standard_D4ls_v6",
-            "locations": ["westeurope"],
+            "locations": ["northeurope"],
             "restrictions": [],
             "family": "StandardDlsv6Family",
             "capabilities": [{"name": "vCPUs", "value": "4"}],
@@ -60,21 +61,23 @@ class ValidateAksPreflightTest(unittest.TestCase):
             vcpus_per_node=VCPUS_PER_NODE,
         )
         validate_kubernetes_version(
-            {"values": [{"version": "1.35", "patchVersions": {"1.35.5": {}}}]},
-            "1.35.5",
+            {"values": [{"version": "1.36", "patchVersions": {"1.36.1": {}}}]},
+            TARGET["kubernetesVersion"],
             TARGET,
         )
 
-    def test_loads_target_facts_from_terraform_native_configuration(self) -> None:
-        target_path = Path(__file__).resolve().parents[3] / "targets/aks/terraform/target.tf.json"
+    def test_loads_target_facts_from_checked_in_json(self) -> None:
+        target_path = Path(__file__).resolve().parents[3] / "targets/aks/terraform/target.json"
         self.assertEqual(load_target_facts(target_path), TARGET)
 
-    def test_rejects_target_fact_contract_drift(self) -> None:
+    def test_rejects_extra_target_facts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "target.tf.json"
+            path = Path(directory) / "target.json"
             path.write_text(
-                '{"locals":{"aks_target":{"region":"westeurope",'
-                '"nodeSku":"Standard_D4ls_v6","nodeCount":2,"requiredVcpus":8}}}',
+                '{"region":"northeurope",'
+                '"nodeSku":"Standard_D4ls_v6","nodeCount":2,'
+                '"kubernetesVersion":"1.36.1",'
+                '"requiredVcpus":8}',
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(AksPreflightError, "unsupported requiredVcpus"):
@@ -88,7 +91,7 @@ class ValidateAksPreflightTest(unittest.TestCase):
                     "value": [
                         {
                             "name": "Standard_D4ls_v6",
-                            "locations": ["westeurope"],
+                            "locations": ["northeurope"],
                             "restrictions": [],
                             "family": "StandardDlsv6Family",
                             "capabilities": [{"name": "vCPUs", "value": "4"}],
@@ -97,6 +100,18 @@ class ValidateAksPreflightTest(unittest.TestCase):
                 },
                 changed_target,
             )
+
+    def test_rejects_malformed_target_kubernetes_version(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "target.json"
+            path.write_text(
+                '{"region":"northeurope",'
+                '"nodeSku":"Standard_D4ls_v6","nodeCount":2,'
+                '"kubernetesVersion":"1.36"}',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AksPreflightError, "full version"):
+                load_target_facts(path)
 
     def test_rejects_wrong_subscription(self) -> None:
         with self.assertRaisesRegex(AksPreflightError, "does not match"):
@@ -107,7 +122,7 @@ class ValidateAksPreflightTest(unittest.TestCase):
             validate_sku(
                 {"value": [{
                     "name": "Standard_D4ls_v6",
-                    "locations": ["westeurope"],
+                    "locations": ["northeurope"],
                     "restrictions": [{"type": "Location"}],
                     "family": "StandardDlsv6Family",
                     "capabilities": [{"name": "vCPUs", "value": "4"}],
@@ -130,20 +145,25 @@ class ValidateAksPreflightTest(unittest.TestCase):
     def test_rejects_unavailable_kubernetes_patch(self) -> None:
         with self.assertRaisesRegex(AksPreflightError, "not offered"):
             validate_kubernetes_version(
-                {"values": [{"version": "1.35", "patchVersions": {}}]}, "1.35.5", TARGET
+                {"values": [{"version": "1.36", "patchVersions": {}}]},
+                TARGET["kubernetesVersion"],
+                TARGET,
             )
 
     def test_rejects_patch_found_only_in_an_unrelated_field(self) -> None:
         with self.assertRaisesRegex(AksPreflightError, "not offered"):
             validate_kubernetes_version(
-                {"note": "1.35.5", "values": [{"version": "1.35", "patchVersions": {}}]},
-                "1.35.5",
+                {
+                    "note": "1.36.1",
+                    "values": [{"version": "1.36", "patchVersions": {}}],
+                },
+                TARGET["kubernetesVersion"],
                 TARGET,
             )
 
     def test_rejects_malformed_kubernetes_version_response(self) -> None:
         with self.assertRaisesRegex(AksPreflightError, "value list"):
-            validate_kubernetes_version({}, "1.35.5", TARGET)
+            validate_kubernetes_version({}, TARGET["kubernetesVersion"], TARGET)
 
     def test_rejects_malformed_kubernetes_version_entry(self) -> None:
         with self.assertRaisesRegex(AksPreflightError, "entry is malformed"):
@@ -154,7 +174,7 @@ class ValidateAksPreflightTest(unittest.TestCase):
                         {"version": "1.36", "patchVersions": []},
                     ]
                 },
-                "1.35.5",
+                TARGET["kubernetesVersion"],
                 TARGET,
             )
 

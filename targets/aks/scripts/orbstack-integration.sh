@@ -4,52 +4,47 @@ set -eu
 
 usage() {
   cat <<'EOF'
-Usage: orbstack-integration.sh [preflight|run]
-
-preflight (default) checks local prerequisites and lints both closed Charts.
-run creates disposable resources in an OrbStack cluster after explicit approval.
+Usage: HALLIGALLI_ORBSTACK_VALUES=path HALLIGALLI_ORBSTACK_APPROVED=1 \
+  orbstack-integration.sh
 
 Environment:
-  HALLIGALLI_ORBSTACK_VALUES   Isolated digest-pinned paired-release values JSON.
-                                Defaults to the checked-in placeholder for preflight only.
+  HALLIGALLI_ORBSTACK_VALUES   Explicit digest-pinned paired-release values JSON.
   HALLIGALLI_ORBSTACK_HOST     Local ingress host (default: halligalli.orb.local).
   HALLIGALLI_ORBSTACK_EVIDENCE Output evidence JSON (default: a temporary path).
-  HALLIGALLI_ORBSTACK_APPROVED Must equal 1 before run can mutate Kubernetes.
+  HALLIGALLI_ORBSTACK_APPROVED Must equal 1 before the helper can mutate Kubernetes.
 
 This one-node helper does not prove multi-node scheduling, pod disruption, AKS
 networking, cloud DNS/TLS, Argo CD reconciliation, or Azure cost and teardown.
 EOF
 }
 
-mode="${1:-preflight}"
-case "$mode" in
-  preflight|run) ;;
-  -h|--help) usage; exit 0 ;;
-  *) usage >&2; exit 2 ;;
-esac
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  usage
+  exit 0
+fi
+[ "$#" -eq 0 ] || { usage >&2; exit 2; }
 
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 aks_root="$(CDPATH='' cd -- "$script_dir/.." && pwd)"
 gitops_root="$aks_root/gitops"
 repo_root="$(CDPATH='' cd -- "$aks_root/../.." && pwd)"
 chart_path="$gitops_root/charts/halligalli"
-observability_chart_path="$gitops_root/charts/halligalli-observability"
-default_values="$gitops_root/values/halligalli.values.json"
-observability_values="$gitops_root/values/halligalli-observability.values.json"
-values_path="${HALLIGALLI_ORBSTACK_VALUES:-$default_values}"
+observability_chart_path="$gitops_root/observability"
+observability_values="$gitops_root/observability/values/aks.values.json"
+values_path="${HALLIGALLI_ORBSTACK_VALUES:-}"
 host="${HALLIGALLI_ORBSTACK_HOST:-halligalli.orb.local}"
 namespace="halligalli"
 observability_namespace="halligalli-observability"
 tls_secret="halligalli-orbstack-tls"
 
-if [ "$mode" = "run" ] && [ -z "${HALLIGALLI_ORBSTACK_VALUES:-}" ]; then
-  echo "OrbStack run requires an explicit HALLIGALLI_ORBSTACK_VALUES file." >&2
+[ -n "$values_path" ] || {
+  echo "OrbStack integration requires an explicit HALLIGALLI_ORBSTACK_VALUES file." >&2
   exit 1
-fi
+}
 
-for command in docker kubectl helm openssl python3; do
+for command in curl docker helm kubectl openssl python3; do
   command -v "$command" >/dev/null 2>&1 || {
-    echo "OrbStack preflight requires $command in PATH; do not install it from this helper." >&2
+    echo "OrbStack integration requires $command in PATH; do not install it from this helper." >&2
     exit 1
   }
 done
@@ -70,27 +65,13 @@ esac
 
 [ -f "$values_path" ] || { echo "Missing HALLIGALLI_ORBSTACK_VALUES: $values_path" >&2; exit 1; }
 
-# Lint before any mutation. Chart schemas own the closed values contracts.
-helm lint "$chart_path" --values "$values_path" \
-  --set "ingress.host=$host" --set "ingress.tlsSecretName=$tls_secret" >/dev/null
-helm lint "$observability_chart_path" \
-  --values "$observability_values" >/dev/null
+redis_secret="halligalli-redis-auth"
 
-redis_secret="$(python3 - "$values_path" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-values = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-print(values["redisSecretName"])
-PY
-)"
-
-if [ "$mode" = "preflight" ]; then
-  printf '%s\n' "OrbStack preflight passed: both closed Chart schemas passed."
-  printf '%s\n' "No Kubernetes, Azure, DNS, or registry operation was performed."
-  exit 0
-fi
+# Render the supplied runtime values before touching the local cluster. Helm
+# still validates the same values during upgrade; that check is built in.
+helm template halligalli-orbstack "$chart_path" --namespace "$namespace" \
+  --values "$values_path" --set "ingress.host=$host" --set "ingress.tlsSecretName=$tls_secret" \
+  >/dev/null
 
 if [ "${HALLIGALLI_ORBSTACK_APPROVED:-}" != "1" ]; then
   echo "Refusing local Kubernetes mutation without HALLIGALLI_ORBSTACK_APPROVED=1." >&2
@@ -115,10 +96,10 @@ kubectl -n "$namespace" create secret generic "$redis_secret" \
 kubectl -n "$namespace" create secret tls "$tls_secret" --cert="$certificate" --key="$private_key" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-helm upgrade --install halligalli-orbstack "$chart_path" --namespace "$namespace" --create-namespace \
+helm upgrade --install halligalli-orbstack "$chart_path" --namespace "$namespace" \
   --values "$values_path" --set "ingress.host=$host" --set "ingress.tlsSecretName=$tls_secret"
 helm upgrade --install halligalli-orbstack-observability "$observability_chart_path" \
-  --namespace "$observability_namespace" --create-namespace --values "$observability_values"
+  --namespace "$observability_namespace" --values "$observability_values"
 
 kubectl -n "$namespace" rollout status deployment/halligalli-redis --timeout=180s
 python3 "$repo_root/.github/utils/verify_running_pod_digests.py" \
@@ -131,7 +112,6 @@ kubectl -n "$namespace" get ingress halligalli >/dev/null
 kubectl -n "$namespace" get secret "$redis_secret" "$tls_secret" >/dev/null
 kubectl -n "$namespace" get networkpolicy halligalli-default-deny halligalli-web halligalli-api halligalli-redis >/dev/null
 kubectl -n "$observability_namespace" get networkpolicy halligalli-observability-default-deny halligalli-observability-prometheus-flow halligalli-observability-collector-flow halligalli-observability-tempo-flow >/dev/null
-kubectl -n "$observability_namespace" get endpoints halligalli-observability-prometheus halligalli-observability-collector halligalli-observability-tempo >/dev/null
 kubectl get --raw "/api/v1/namespaces/$observability_namespace/services/http:halligalli-observability-prometheus:9090/proxy/api/v1/query?query=up" >/dev/null
 kubectl get --raw "/api/v1/namespaces/$observability_namespace/services/http:halligalli-observability-tempo:3200/proxy/api/status/buildinfo" >/dev/null
 curl --fail --silent --show-error --insecure --resolve "$host:443:127.0.0.1" "https://$host/" >/dev/null

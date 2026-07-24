@@ -1,9 +1,0 @@
-{
-  "locals": {
-    "aks_target": {
-      "region": "westeurope",
-      "nodeSku": "Standard_D4ls_v6",
-      "nodeCount": 2
-    }
-  }
-}

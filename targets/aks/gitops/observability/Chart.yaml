@@ -2,5 +2,4 @@ apiVersion: v2
 name: halligalli-observability
 description: Disposable metrics and traces stack for an AKS Validation Run
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.2.0

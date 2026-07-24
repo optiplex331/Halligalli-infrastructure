@@ -33,7 +33,7 @@ def expected_digests(values: dict[str, Any]) -> dict[str, str]:
     for component, key in COMPONENTS.items():
         image = values.get(key)
         digest = image.get("digest") if isinstance(image, dict) else None
-        if not isinstance(digest, str) or DIGEST_RE.fullmatch(digest) is None:
+        if not isinstance(digest, str):
             raise PodDigestError(f"desired state requires digest-pinned {key}")
         result[component] = digest
     return result

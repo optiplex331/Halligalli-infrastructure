@@ -12,24 +12,26 @@ facts. Raw output and sensitive or identifying operation data stay outside Git.
 ## Ownership and desired state
 
 Terraform owns Azure resources through the AKS cluster boundary. The Terraform
-root describes one concrete target; only the Kubernetes patch version is an
-operation-time input. Resource names, network, identity, and tags belong to the
-Terraform configuration. Its native `target.tf.json` is the single owner of the
-region, node SKU, and node count consumed by Terraform and technical preflight.
+root describes one concrete target. Its checked-in `target.json` is the single
+owner of the region, node SKU, node count, and Kubernetes patch version consumed
+by Terraform and technical preflight. Resource names, network, identity, and
+tags belong to the Terraform configuration.
 Technical preflight derives per-node vCPU capacity and quota family from the
 matched Azure SKU response before checking quota; these derived facts must not be
 duplicated in prose or local configuration.
 
-Argo CD owns the in-cluster runtime and observability Applications. Their
-multi-source definitions select Infrastructure-owned charts and values from
-this repository. The runtime desired state owns the complete digest-pinned
-Web/API pair, Redis digest, display release version, existing Redis Secret name,
-and operation-time ingress names. The observability desired state owns the
+Argo CD owns the in-cluster runtime and observability Applications. Each
+Application uses one Infrastructure-owned Chart source and a Values file
+relative to that Chart. The runtime desired state owns the complete digest-pinned
+Web/API pair, Redis digest, and operation-time ingress names. The Redis Secret
+name is a fixed chart and operation constant. The observability desired state
+owns the
 Prometheus, OpenTelemetry Collector, and Tempo image digests. Grafana is not
 part of the maintained disposable stack.
 
 The runtime chart owns routing, replicas, rollout and disruption behavior,
-topology spread, restricted security contexts, ServiceAccounts, and
+topology spread, restricted security contexts, one chart-owned ServiceAccount;
+the observability chart owns one equivalent chart-level ServiceAccount and
 NetworkPolicies. Ingress sends public REST and WebSocket paths to API and all
 other public paths to Web; internal API surfaces remain cluster-only. Redis is
 ephemeral and receives a locally generated ACL Secret, never a credential in
@@ -57,10 +59,12 @@ local-operation approval. Without it, stop. Do not substitute a different
 subscription, region, SKU, version, release pair, DNS design, or historical
 cluster.
 
-Static tests, backendless Terraform validation, Helm lint, and the default
-OrbStack preflight are read-only. They do not establish a deployed state. A
-real Terraform plan may query remote state and acquire a state lock, so it is
-also approval-gated. A successful plan never authorizes apply.
+Static tests, backendless Terraform validation, and Helm lint are read-only.
+The OrbStack integration helper requires separate local approval before it
+creates disposable Kubernetes resources. None of these checks establish an
+AKS deployed state. A real Terraform plan may query remote state and acquire a
+state lock, so it is also approval-gated. A successful plan never authorizes
+apply.
 
 ## Static validation
 
@@ -72,8 +76,8 @@ actionlint
 terraform -chdir=targets/aks/terraform fmt -check -recursive
 terraform -chdir=targets/aks/terraform init -backend=false -input=false
 terraform -chdir=targets/aks/terraform validate -no-color
-helm lint targets/aks/gitops/charts/halligalli --values targets/aks/gitops/values/halligalli.values.json
-helm lint targets/aks/gitops/charts/halligalli-observability --values targets/aks/gitops/values/halligalli-observability.values.json
+helm lint targets/aks/gitops/charts/halligalli --values targets/aks/gitops/charts/halligalli/values/aks.values.json
+helm lint targets/aks/gitops/observability --values targets/aks/gitops/observability/values/aks.values.json
 ```
 
 These checks validate source, structured utilities, Terraform configuration,
@@ -84,18 +88,18 @@ scheduling, disruption, DNS, rollback, cost, or destruction.
 
 ## Local OrbStack integration
 
-OrbStack is the low-cost Kubernetes runtime seam. Its preflight confirms the
-active Docker engine and Kubernetes context are OrbStack and lints both chart
-schemas without mutation:
+OrbStack is the low-cost Kubernetes runtime seam. The repository-level static
+commands above own chart linting; the integration helper only creates and
+checks disposable local Kubernetes resources. It requires an explicit,
+reviewed, digest-pinned values file and approval:
 
 ```bash
-targets/aks/scripts/orbstack-integration.sh preflight
+HALLIGALLI_ORBSTACK_VALUES=/path/to/values.json \
+HALLIGALLI_ORBSTACK_APPROVED=1 \
+targets/aks/scripts/orbstack-integration.sh
 ```
 
-`run` requires an explicit `HALLIGALLI_ORBSTACK_VALUES` path to a separately
-supplied, reviewed, digest-pinned values file and
-`HALLIGALLI_ORBSTACK_APPROVED=1`. It creates disposable local Kubernetes
-resources, checks runtime and observability rollouts, verifies every current
+The helper checks runtime and observability rollouts, verifies every current
 Ready Web/API Pod image digest, checks Ingress, Secrets, NetworkPolicies,
 Prometheus and Tempo query paths, and exercises same-origin HTTPS behavior.
 Use its `--help` output and source as the command contract. It does not prove
@@ -113,8 +117,8 @@ cp targets/aks/terraform/local-operation.env.example targets/aks/terraform/local
 targets/aks/scripts/aks-validation-preflight.sh
 ```
 
-The script verifies the exact selected subscription, the fixed target region
-and node SKU, available quota, and the requested supported Kubernetes patch.
+The script verifies the exact selected subscription, the fixed target region,
+node SKU, checked-in Kubernetes patch, and available quota.
 It trusts the reviewed `main` desired state that already passed static PR
 validation, initializes the configured remote backend, and saves a Terraform
 create plan under ignored `.local/` output. Review the saved plan and abort on
