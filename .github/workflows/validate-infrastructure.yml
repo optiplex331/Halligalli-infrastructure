@@ -58,5 +58,5 @@ jobs:
 
       - name: Validate Helm charts and values
         run: |
-          helm lint targets/aks/gitops/charts/halligalli --values targets/aks/gitops/values/halligalli.values.json
-          helm lint targets/aks/gitops/charts/halligalli-observability --values targets/aks/gitops/values/halligalli-observability.values.json
+          helm lint targets/aks/gitops/charts/halligalli --values targets/aks/gitops/charts/halligalli/values/aks.values.json
+          helm lint targets/aks/gitops/observability --values targets/aks/gitops/observability/values/aks.values.json
