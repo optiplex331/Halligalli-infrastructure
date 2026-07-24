@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.9.0"
+  required_version = ">= 1.15.0"
 
   backend "azurerm" {}
 
@@ -9,10 +9,4 @@ terraform {
       version = "~> 4.0"
     }
   }
-}
-
-provider "azurerm" {
-  resource_provider_registrations = "none"
-
-  features {}
 }
