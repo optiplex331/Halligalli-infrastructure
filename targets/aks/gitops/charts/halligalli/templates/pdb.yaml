@@ -1,14 +1,27 @@
-{{- range $component := list "web" "api" }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: halligalli-{{ $component }}
+  name: halligalli-web
   labels:
-    {{- include "halligalli.labels" $ | nindent 4 }}
+    app.kubernetes.io/part-of: halligalli
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      {{- include "halligalli.selectorLabels" (dict "component" $component) | nindent 6 }}
+      app.kubernetes.io/name: halligalli
+      app.kubernetes.io/component: web
 ---
-{{- end }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: halligalli-api
+  labels:
+    app.kubernetes.io/part-of: halligalli
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: halligalli
+      app.kubernetes.io/component: api

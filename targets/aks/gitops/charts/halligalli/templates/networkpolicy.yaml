@@ -3,7 +3,8 @@ kind: NetworkPolicy
 metadata:
   name: halligalli-default-deny
   labels:
-    {{- include "halligalli.labels" . | nindent 4 }}
+    app.kubernetes.io/part-of: halligalli
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   podSelector:
     matchLabels:
@@ -15,11 +16,13 @@ kind: NetworkPolicy
 metadata:
   name: halligalli-web
   labels:
-    {{- include "halligalli.labels" . | nindent 4 }}
+    app.kubernetes.io/part-of: halligalli
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "halligalli.selectorLabels" (dict "component" "web") | nindent 6 }}
+      app.kubernetes.io/name: halligalli
+      app.kubernetes.io/component: web
   policyTypes: [Ingress, Egress]
   ingress:
     - from:
@@ -51,11 +54,13 @@ kind: NetworkPolicy
 metadata:
   name: halligalli-api
   labels:
-    {{- include "halligalli.labels" . | nindent 4 }}
+    app.kubernetes.io/part-of: halligalli
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "halligalli.selectorLabels" (dict "component" "api") | nindent 6 }}
+      app.kubernetes.io/name: halligalli
+      app.kubernetes.io/component: api
   policyTypes: [Ingress, Egress]
   ingress:
     - from:
@@ -78,7 +83,8 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              {{- include "halligalli.selectorLabels" (dict "component" "redis") | nindent 14 }}
+              app.kubernetes.io/name: halligalli
+              app.kubernetes.io/component: redis
       ports:
         - protocol: TCP
           port: 6379
@@ -110,17 +116,20 @@ kind: NetworkPolicy
 metadata:
   name: halligalli-redis
   labels:
-    {{- include "halligalli.labels" . | nindent 4 }}
+    app.kubernetes.io/part-of: halligalli
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "halligalli.selectorLabels" (dict "component" "redis") | nindent 6 }}
+      app.kubernetes.io/name: halligalli
+      app.kubernetes.io/component: redis
   policyTypes: [Ingress]
   ingress:
     - from:
         - podSelector:
             matchLabels:
-              {{- include "halligalli.selectorLabels" (dict "component" "api") | nindent 14 }}
+              app.kubernetes.io/name: halligalli
+              app.kubernetes.io/component: api
       ports:
         - protocol: TCP
           port: 6379

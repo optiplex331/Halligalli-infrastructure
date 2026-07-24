@@ -6,10 +6,9 @@ if [ "${HALLIGALLI_OPERATION_APPROVED:-}" != "1" ]; then
   exit 1
 fi
 
-namespace="${HALLIGALLI_NAMESPACE:-halligalli}"
 password="$(openssl rand -hex 32)"
 
-kubectl -n "$namespace" create secret generic halligalli-redis-auth \
+kubectl -n halligalli create secret generic halligalli-redis-auth \
   --from-literal=username=halligalli-api \
   --from-literal=password="$password" \
   --dry-run=client -o yaml | kubectl apply -f -

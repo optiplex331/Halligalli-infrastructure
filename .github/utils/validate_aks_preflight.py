@@ -9,10 +9,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-
-VERSION_RE = re.compile(r"^1\.[0-9]{2}\.[0-9]+$")
 BACKEND_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
-TARGET_KEYS = {"region", "nodeSku", "nodeCount"}
+VERSION_RE = re.compile(r"^1\.[0-9]{2}\.[0-9]+$")
+TARGET_KEYS = {"region", "nodeSku", "nodeCount", "kubernetesVersion"}
 
 
 class AksPreflightError(ValueError):
@@ -42,21 +41,17 @@ def _require_exact_keys(value: dict[str, Any], expected: set[str], context: str)
 
 
 def load_target_facts(path: Path) -> dict[str, Any]:
-    """Load the concrete target facts from Terraform's native JSON configuration."""
-    document = load_object(path)
-    _require_exact_keys(document, {"locals"}, "AKS Terraform target")
-    locals_block = document["locals"]
-    if not isinstance(locals_block, dict):
-        raise AksPreflightError("AKS Terraform target locals must be an object.")
-    _require_exact_keys(locals_block, {"aks_target"}, "AKS Terraform target locals")
-    target = locals_block["aks_target"]
-    if not isinstance(target, dict):
-        raise AksPreflightError("AKS Terraform target facts must be an object.")
+    """Load the concrete target facts from the checked-in target JSON."""
+    target = load_object(path)
     _require_exact_keys(target, TARGET_KEYS, "AKS Terraform target facts")
 
-    for key in ("region", "nodeSku"):
+    for key in ("region", "nodeSku", "kubernetesVersion"):
         if not isinstance(target[key], str) or not target[key]:
             raise AksPreflightError(f"AKS Terraform target {key} must be a non-empty string.")
+    if not VERSION_RE.fullmatch(target["kubernetesVersion"]):
+        raise AksPreflightError(
+            "AKS Terraform target kubernetesVersion must be a full version such as 1.35.5."
+        )
     if not isinstance(target["nodeCount"], int) or isinstance(target["nodeCount"], bool) or target["nodeCount"] < 1:
         raise AksPreflightError("AKS Terraform target nodeCount must be a positive integer.")
     return target
@@ -144,8 +139,6 @@ def validate_quota(
 def validate_kubernetes_version(
     payload: dict[str, Any], target_version: str, target: dict[str, Any]
 ) -> None:
-    if not VERSION_RE.fullmatch(target_version):
-        raise AksPreflightError("Kubernetes version must be a full version such as 1.35.5.")
     values = payload.get("values")
     if not isinstance(values, list):
         raise AksPreflightError("Azure Kubernetes version data does not contain a value list.")
@@ -189,15 +182,14 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     target_field = subparsers.add_parser("target-field")
-    target_field.add_argument("--terraform-target", type=Path, required=True)
+    target_field.add_argument("--target-facts", type=Path, required=True)
     target_field.add_argument(
-        "--name", choices=("region", "nodeSku", "nodeCount"), required=True
+        "--name", choices=("region", "nodeSku", "nodeCount", "kubernetesVersion"), required=True
     )
 
     validate = subparsers.add_parser("validate")
-    validate.add_argument("--terraform-target", type=Path, required=True)
+    validate.add_argument("--target-facts", type=Path, required=True)
     validate.add_argument("--expected-subscription", required=True)
-    validate.add_argument("--kubernetes-version", required=True)
     validate.add_argument("--subscription", type=Path, required=True)
     validate.add_argument("--resource-skus", type=Path, required=True)
     validate.add_argument("--quota", type=Path, required=True)
@@ -207,7 +199,7 @@ def main() -> None:
     validate.add_argument("--backend-output", type=Path, required=True)
     args = parser.parse_args()
 
-    target = load_target_facts(args.terraform_target)
+    target = load_target_facts(args.target_facts)
     if args.command == "target-field":
         print(target[args.name])
         return
@@ -220,7 +212,9 @@ def main() -> None:
         quota_family=quota_family,
         vcpus_per_node=vcpus_per_node,
     )
-    validate_kubernetes_version(load_object(args.aks_versions), args.kubernetes_version, target)
+    validate_kubernetes_version(
+        load_object(args.aks_versions), target["kubernetesVersion"], target
+    )
     write_backend_config(args.backend_output, args.terraform_organization, args.terraform_workspace)
     print(
         json.dumps(
@@ -230,7 +224,7 @@ def main() -> None:
                 "nodeSku": target["nodeSku"],
                 "nodeCount": target["nodeCount"],
                 "requiredVcpus": target["nodeCount"] * vcpus_per_node,
-                "kubernetesVersion": args.kubernetes_version,
+                "kubernetesVersion": target["kubernetesVersion"],
             },
             indent=2,
         )
