@@ -46,14 +46,13 @@ class PrepareTargetPromotionTest(unittest.TestCase):
                     "v1.2.3",
                     "--manifest",
                     str(FIXTURES / manifest),
-                    "--repo-root",
-                    str(root),
                     "--pr-body-output",
                     str(body_path),
                 ],
                 check=False,
                 capture_output=True,
                 text=True,
+                cwd=root,
                 env=environment,
             )
             promoted = json.loads(target_path.read_text())
@@ -73,7 +72,6 @@ class PrepareTargetPromotionTest(unittest.TestCase):
             with self.subTest(target=target):
                 result, promoted, body, _ = self.run_prepare(target)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(promoted["releaseVersion"], "1.2.3")
                 self.assertEqual(promoted["webImage"]["digest"], "sha256:" + "b" * 64)
                 self.assertEqual(promoted["apiImage"]["digest"], "sha256:" + "c" * 64)
                 self.assertIn(expected_marker, body)
@@ -84,20 +82,13 @@ class PrepareTargetPromotionTest(unittest.TestCase):
                 self.assertIn("Artifact provenance: verified", body)
                 self.assertNotIn("Manifest SHA-256", body)
                 if target == "container-apps":
-                    self.assertEqual(promoted["target"], "container-apps")
-                    self.assertEqual(promoted["releaseCommit"], "a" * 40)
+                    self.assertEqual(
+                        set(promoted),
+                        {"deploymentEnabled", "webImage", "apiImage", "redisImage"},
+                    )
                     self.assertTrue(promoted["deploymentEnabled"])
                 else:
-                    self.assertNotIn("target", promoted)
                     self.assertEqual(promoted["ingress"]["host"], "proof.invalid")
-
-    def test_rejects_cross_target_desired_state(self) -> None:
-        result, promoted, _, _ = self.run_prepare(
-            "container-apps", desired_fixture="aks-desired-state.json"
-        )
-        self.assertNotEqual(result.returncode, 0)
-        self.assertNotIn("target", promoted)
-        self.assertIn("container-apps desired state", result.stderr)
 
     def test_rejects_partial_release_pair(self) -> None:
         result, promoted, _, _ = self.run_prepare(
@@ -115,15 +106,12 @@ class PrepareTargetPromotionTest(unittest.TestCase):
             "aks", desired_fixture="aks-promoted-desired-state.json"
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(promoted["releaseVersion"], "1.2.3")
         self.assertIn('"promotion_required": "false"', result.stdout)
 
-    def test_replaces_stale_release_fields_as_one_pair(self) -> None:
+    def test_replaces_stale_runtime_images(self) -> None:
         desired_state = json.loads((FIXTURES / "container-apps-desired-state.json").read_text())
         desired_state.update(
             {
-                "releaseVersion": None,
-                "releaseCommit": "not-a-commit",
                 "deploymentEnabled": False,
                 "webImage": {"repository": "stale"},
                 "apiImage": {"digest": "stale"},
@@ -135,8 +123,6 @@ class PrepareTargetPromotionTest(unittest.TestCase):
             manifest=json.loads((FIXTURES / "paired-release-manifest.json").read_text()),
             desired_state=desired_state,
         )
-        self.assertEqual(promotion["desired_state"]["releaseVersion"], "1.2.3")
-        self.assertEqual(promotion["desired_state"]["releaseCommit"], "a" * 40)
         self.assertTrue(promotion["desired_state"]["deploymentEnabled"])
         self.assertEqual(promotion["desired_state"]["webImage"]["digest"], "sha256:" + "b" * 64)
         self.assertEqual(promotion["desired_state"]["apiImage"]["digest"], "sha256:" + "c" * 64)
@@ -152,7 +138,7 @@ class PrepareTargetPromotionTest(unittest.TestCase):
                 desired_state=desired_state,
             )
 
-    def test_ignores_release_fields_not_consumed_by_promotion(self) -> None:
+    def test_ignores_unused_manifest_fields(self) -> None:
         desired_state = json.loads((FIXTURES / "aks-desired-state.json").read_text())
         manifest = json.loads((FIXTURES / "paired-release-manifest.json").read_text())
         manifest["runtimeIdentity"] = {"version": "unused", "commit": "unused"}
@@ -170,7 +156,10 @@ class PrepareTargetPromotionTest(unittest.TestCase):
             promotion["desired_state"]["webImage"]["repository"],
             "ghcr.io/optiplex331/halligalli-bossyang-web",
         )
-        self.assertEqual(promotion["desired_state"]["releaseVersion"], "1.2.3")
+        self.assertEqual(
+            promotion["desired_state"]["apiImage"]["repository"],
+            "ghcr.io/optiplex331/halligalli-bossyang-api",
+        )
 
     def test_rejects_unknown_manifest_schema(self) -> None:
         desired_state = json.loads((FIXTURES / "aks-desired-state.json").read_text())
@@ -225,7 +214,7 @@ class PrepareTargetPromotionTest(unittest.TestCase):
         self.assertEqual(
             outputs,
             {
-                "desired_state_path=targets/aks/gitops/values/halligalli.values.json",
+                "desired_state_path=targets/aks/gitops/charts/halligalli/values/aks.values.json",
                 "promotion_branch=automation/aks-promotion",
                 "commit_message=chore(aks): promote Halligalli v1.2.3",
                 "commit=" + "a" * 40,

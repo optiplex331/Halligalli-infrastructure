@@ -17,15 +17,13 @@ PRODUCT_IMAGES = {
 }
 TARGETS = {
     "aks": {
-        "desired_state_path": "targets/aks/gitops/values/halligalli.values.json",
+        "desired_state_path": "targets/aks/gitops/charts/halligalli/values/aks.values.json",
         "promotion_branch": "automation/aks-promotion",
-        "commit_scope": "aks",
         "display_name": "AKS Deployment Target",
     },
     "container-apps": {
         "desired_state_path": "targets/container-apps/desired-state.json",
         "promotion_branch": "automation/container-apps-promotion",
-        "commit_scope": "container-apps",
         "display_name": "container-apps Live Demo Environment",
     },
 }
@@ -43,27 +41,24 @@ def _release_selection(manifest: Any, release_tag: str) -> dict[str, Any]:
 
     try:
         commit = manifest["commit"]
-        images = {
-            role: {
+        images = {}
+        for role, repository in PRODUCT_IMAGES.items():
+            images[role] = {
                 "repository": repository,
                 "digest": manifest["images"][role]["digest"],
             }
-            for role, repository in PRODUCT_IMAGES.items()
-        }
     except (KeyError, TypeError):
         raise PromotionError("manifest is missing promotion evidence") from None
 
     if not isinstance(commit, str) or not COMMIT_RE.fullmatch(commit):
         raise PromotionError("manifest commit is invalid")
     if any(
-        not isinstance(image["digest"], str)
-        or not DIGEST_RE.fullmatch(image["digest"])
+        not isinstance(image["digest"], str) or not DIGEST_RE.fullmatch(image["digest"])
         for image in images.values()
     ):
         raise PromotionError("manifest image digest is invalid")
 
     return {
-        "version": release_tag.removeprefix("v"),
         "commit": commit,
         "images": images,
     }
@@ -73,41 +68,30 @@ def _image_subject(image: dict[str, str]) -> str:
     return f'{image["repository"]}@{image["digest"]}'
 
 
-def _promotion_request(target_name: str, release_tag: str) -> dict[str, str]:
-    target = TARGETS.get(target_name)
-    if target is None:
-        raise PromotionError(f"target must be one of: {', '.join(TARGETS)}")
-    if not TAG_RE.fullmatch(release_tag):
-        raise PromotionError("release_tag must match vX.Y.Z")
-    return {
-        "desired_state_path": target["desired_state_path"],
-        "promotion_branch": target["promotion_branch"],
-        "commit_message": f"chore({target['commit_scope']}): promote Halligalli {release_tag}",
-    }
-
-
 def _build_target_promotion(
     target_name: str, desired_state: Any, release: dict[str, Any]
 ) -> dict[str, Any]:
     if not isinstance(desired_state, dict):
         raise PromotionError("desired state must be a JSON object")
-    if (
-        target_name == "container-apps"
-        and desired_state.get("target") != "container-apps"
-    ):
-        raise PromotionError(
-            "container-apps promotion requires container-apps desired state"
-        )
-    if target_name == "aks" and "target" in desired_state:
-        raise PromotionError("AKS promotion rejects desired state for another target")
+
+    if target_name == "container-apps":
+        redis_image = desired_state.get("redisImage")
+        if not isinstance(redis_image, dict):
+            raise PromotionError("container-apps desired state requires redisImage")
+        return {
+            "deploymentEnabled": True,
+            "webImage": release["images"]["web"],
+            "apiImage": release["images"]["api"],
+            "redisImage": redis_image,
+        }
 
     promoted = dict(desired_state)
-    for role, key in (("web", "webImage"), ("api", "apiImage")):
-        promoted[key] = release["images"][role]
-    promoted["releaseVersion"] = release["version"]
-    if target_name == "container-apps":
-        promoted["releaseCommit"] = release["commit"]
-        promoted["deploymentEnabled"] = True
+    promoted.update(
+        {
+            "webImage": release["images"]["web"],
+            "apiImage": release["images"]["api"],
+        }
+    )
     return promoted
 
 
@@ -128,14 +112,21 @@ Review whether this release should be deployed to the {target["display_name"]} a
 """
 
 
-def _prepare_resolved_promotion(
+def prepare_promotion(
     *,
-    request: dict[str, str],
     target_name: str,
     release_tag: str,
     manifest: Any,
     desired_state: Any,
 ) -> dict[str, Any]:
+    """Validate and prepare a target promotion."""
+
+    target = TARGETS.get(target_name)
+    if target is None:
+        raise PromotionError(f"target must be one of: {', '.join(TARGETS)}")
+    if not TAG_RE.fullmatch(release_tag):
+        raise PromotionError("release_tag must match vX.Y.Z")
+
     release = _release_selection(manifest, release_tag)
     promoted = _build_target_promotion(target_name, desired_state, release)
     return {
@@ -146,25 +137,15 @@ def _prepare_resolved_promotion(
             release=release,
         ),
         "outputs": {
-            **request,
+            "desired_state_path": target["desired_state_path"],
+            "promotion_branch": target["promotion_branch"],
+            "commit_message": f"chore({target_name}): promote Halligalli {release_tag}",
             "commit": release["commit"],
             "web_image": _image_subject(release["images"]["web"]),
             "api_image": _image_subject(release["images"]["api"]),
             "promotion_required": "true" if promoted != desired_state else "false",
         },
     }
-
-
-def prepare_promotion(
-    *, target_name: str, release_tag: str, manifest: Any, desired_state: Any
-) -> dict[str, Any]:
-    return _prepare_resolved_promotion(
-        request=_promotion_request(target_name, release_tag),
-        target_name=target_name,
-        release_tag=release_tag,
-        manifest=manifest,
-        desired_state=desired_state,
-    )
 
 
 def write_outputs(values: dict[str, str]) -> None:
@@ -180,18 +161,22 @@ def main() -> None:
     parser.add_argument("--target", required=True)
     parser.add_argument("--release-tag", required=True)
     parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--repo-root", type=Path, default=Path("."))
     parser.add_argument("--pr-body-output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        request = _promotion_request(args.target, args.release_tag)
-        desired_state_path = args.repo_root / request["desired_state_path"]
-        promotion = _prepare_resolved_promotion(
-            request=request,
+        target = TARGETS.get(args.target)
+        if target is None:
+            raise PromotionError(f"target must be one of: {', '.join(TARGETS)}")
+
+        desired_state_path = Path(target["desired_state_path"])
+
+        promotion = prepare_promotion(
             target_name=args.target,
             release_tag=args.release_tag,
             manifest=json.loads(args.manifest.read_text(encoding="utf-8")),
-            desired_state=json.loads(desired_state_path.read_text(encoding="utf-8")),
+            desired_state=json.loads(
+                desired_state_path.read_text(encoding="utf-8")
+            ),
         )
         if promotion["outputs"]["promotion_required"] == "true":
             desired_state_path.write_text(

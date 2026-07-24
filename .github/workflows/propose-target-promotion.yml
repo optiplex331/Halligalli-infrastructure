@@ -56,9 +56,9 @@ jobs:
         shell: bash
         env:
           API_IMAGE: ${{ steps.promotion.outputs.api_image }}
+          WEB_IMAGE: ${{ steps.promotion.outputs.web_image }}
           COMMIT: ${{ steps.promotion.outputs.commit }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-          WEB_IMAGE: ${{ steps.promotion.outputs.web_image }}
         run: |
           set -euo pipefail
           for image in "${WEB_IMAGE}" "${API_IMAGE}"; do
