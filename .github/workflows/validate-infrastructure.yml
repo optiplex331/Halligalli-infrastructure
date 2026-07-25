@@ -60,3 +60,10 @@ jobs:
         run: |
           helm lint targets/aks/gitops/halligalli --values targets/aks/gitops/halligalli/values/aks.values.json
           helm lint targets/aks/gitops/observability --values targets/aks/gitops/observability/values/aks.values.json
+          if helm template halligalli-orbstack targets/aks/gitops/halligalli \
+            --namespace halligalli \
+            --values targets/aks/gitops/halligalli/values/aks.values.json \
+            --set tls.enabled=false | grep -Eq 'cert-manager.io/v1|^kind: (Certificate|ClusterIssuer)$'; then
+            echo 'tls.enabled=false must omit cert-manager resources'
+            exit 1
+          fi

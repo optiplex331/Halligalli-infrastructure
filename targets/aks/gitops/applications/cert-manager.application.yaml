@@ -1,25 +1,29 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: halligalli-observability
+  name: cert-manager
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-wave: "-2"
   labels:
-    app.kubernetes.io/name: halligalli-observability
+    app.kubernetes.io/name: cert-manager
     app.kubernetes.io/part-of: aks
 spec:
   project: default
   source:
-    repoURL: https://github.com/optiplex331/Halligalli-infrastructure.git
-    targetRevision: main
-    path: targets/aks/gitops/observability
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: v1.21.0
     helm:
-      valueFiles:
-        - values/aks.values.json
+      releaseName: cert-manager
+      parameters:
+        - name: crds.enabled
+          value: "true"
+        - name: crds.keep
+          value: "true"
   destination:
     server: https://kubernetes.default.svc
-    namespace: halligalli-observability
+    namespace: cert-manager
   syncPolicy:
     automated:
       prune: true

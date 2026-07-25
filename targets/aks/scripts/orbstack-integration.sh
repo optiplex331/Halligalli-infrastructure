@@ -71,6 +71,7 @@ redis_secret="halligalli-redis-auth"
 # still validates the same values during upgrade; that check is built in.
 helm template halligalli-orbstack "$chart_path" --namespace "$namespace" \
   --values "$values_path" --set "ingress.host=$host" --set "ingress.tlsSecretName=$tls_secret" \
+  --set "tls.enabled=false" \
   >/dev/null
 
 if [ "${HALLIGALLI_ORBSTACK_APPROVED:-}" != "1" ]; then
@@ -97,7 +98,8 @@ kubectl -n "$namespace" create secret tls "$tls_secret" --cert="$certificate" --
   --dry-run=client -o yaml | kubectl apply -f -
 
 helm upgrade --install halligalli-orbstack "$chart_path" --namespace "$namespace" \
-  --values "$values_path" --set "ingress.host=$host" --set "ingress.tlsSecretName=$tls_secret"
+  --values "$values_path" --set "ingress.host=$host" --set "ingress.tlsSecretName=$tls_secret" \
+  --set "tls.enabled=false"
 helm upgrade --install halligalli-orbstack-observability "$observability_chart_path" \
   --namespace "$observability_namespace" --values "$observability_values"
 

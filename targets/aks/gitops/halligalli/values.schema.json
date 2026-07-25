@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
-  "required": ["webImage", "apiImage", "redisImage", "ingress"],
+  "required": ["webImage", "apiImage", "redisImage", "ingress", "tls"],
   "properties": {
     "webImage": {"$ref": "#/definitions/image"},
     "apiImage": {"$ref": "#/definitions/image"},
@@ -13,6 +13,15 @@
       "properties": {
         "host": {"type": "string", "minLength": 1},
         "tlsSecretName": {"type": "string", "minLength": 1}
+      }
+    },
+    "tls": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enabled", "clusterIssuer", "email"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "clusterIssuer": {"type": "string", "minLength": 1},
+        "email": {"type": "string", "format": "email", "minLength": 3}
       }
     }
   },
