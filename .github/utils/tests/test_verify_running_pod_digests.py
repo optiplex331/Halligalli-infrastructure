@@ -40,8 +40,10 @@ def malformed_pod(mutation: str) -> dict:
     value = pod("web", WEB)
     if mutation == "status":
         del value["status"]
-    elif mutation == "containerStatuses":
+    elif mutation == "containerStatuses malformed":
         value["status"]["containerStatuses"] = None
+    elif mutation == "containerStatuses missing":
+        del value["status"]["containerStatuses"]
     elif mutation == "business":
         value["status"]["containerStatuses"][0]["name"] = "other"
     elif mutation == "imageID":
@@ -73,7 +75,8 @@ class RunningPodDigestTest(unittest.TestCase):
 
         malformed_cases = (
             ("status is absent", "status", "status is malformed"),
-            ("container statuses are absent", "containerStatuses", "containerStatuses are malformed"),
+            ("container statuses have the wrong shape", "containerStatuses malformed", "containerStatuses are malformed"),
+            ("container statuses are absent", "containerStatuses missing", "business container is not Ready"),
             ("business container is absent", "business", "business container is not Ready"),
             ("business image ID has no digest", "imageID", "no terminal sha256 digest"),
             ("business image ID is absent", "missing imageID", "must be a string"),
