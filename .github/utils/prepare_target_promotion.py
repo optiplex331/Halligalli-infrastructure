@@ -17,7 +17,7 @@ PRODUCT_IMAGES = {
 }
 TARGETS = {
     "aks": {
-        "desired_state_path": "targets/aks/gitops/charts/halligalli/values/aks.values.json",
+        "desired_state_path": "targets/aks/gitops/halligalli/values/aks.values.json",
         "promotion_branch": "automation/aks-promotion",
         "display_name": "AKS Deployment Target",
     },
