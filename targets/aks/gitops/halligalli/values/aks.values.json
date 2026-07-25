@@ -12,7 +12,12 @@
     "digest": "sha256:62b5498c91778f738f0efbf0a6fd5b434011235a3e7b5f2ed4a2c0c63bb1c786"
   },
   "ingress": {
-    "host": "proof.invalid",
-    "tlsSecretName": "halligalli-proof-tls"
+    "host": "aks.halligalli.games",
+    "tlsSecretName": "halligalli-tls"
+  },
+  "tls": {
+    "enabled": true,
+    "clusterIssuer": "letsencrypt-staging",
+    "email": "optiplex331@gmail.com"
   }
 }
