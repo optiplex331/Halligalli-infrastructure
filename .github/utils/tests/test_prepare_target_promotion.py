@@ -45,16 +45,12 @@ class PrepareTargetPromotionTest(unittest.TestCase):
         target: str,
         *,
         manifest: str = "paired-release-manifest.json",
-        desired_fixture: str | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], dict, str, set[str]]:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             target_path = root / TARGETS[target]["desired_state_path"]
             target_path.parent.mkdir(parents=True)
-            shutil.copy(
-                FIXTURES / (desired_fixture or f"{target}-desired-state.json"),
-                target_path,
-            )
+            shutil.copy(FIXTURES / f"{target}-desired-state.json", target_path)
             body_path = root / "pr.md"
             github_output = root / "github-output.txt"
             environment = {**os.environ, "GITHUB_OUTPUT": str(github_output)}
@@ -112,6 +108,25 @@ class PrepareTargetPromotionTest(unittest.TestCase):
                     self.assertTrue(promoted["deploymentEnabled"])
                 else:
                     self.assertEqual(promoted["ingress"]["host"], "proof.invalid")
+
+        manifest = self.load_fixture("paired-release-manifest.json")
+        manifest["runtimeIdentity"] = {"version": "unused", "commit": "unused"}
+        manifest["images"]["web"]["repository"] = "unused"
+        manifest["images"]["api"]["tag"] = "unused"
+        promotion = prepare_promotion(
+            target_name="aks",
+            release_tag="v1.2.3",
+            manifest=manifest,
+            desired_state=self.load_fixture("aks-desired-state.json"),
+        )
+        self.assertEqual(
+            promotion["desired_state"]["webImage"]["repository"],
+            "ghcr.io/optiplex331/halligalli-bossyang-web",
+        )
+        self.assertEqual(
+            promotion["desired_state"]["apiImage"]["repository"],
+            "ghcr.io/optiplex331/halligalli-bossyang-api",
+        )
 
     def test_rejects_partial_release_pair(self) -> None:
         with self.assertRaisesRegex(PromotionError, "missing promotion evidence"):
@@ -217,6 +232,13 @@ class PrepareTargetPromotionTest(unittest.TestCase):
                 "promotion_required=true",
             },
         )
+
+        failed, unchanged, _, _ = self.run_cli(
+            "aks", manifest="partial-paired-release-manifest.json"
+        )
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertEqual(unchanged, self.load_fixture("aks-desired-state.json"))
+        self.assertIn("missing promotion evidence", failed.stderr)
 
 
 if __name__ == "__main__":
