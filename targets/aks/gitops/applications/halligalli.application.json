@@ -14,7 +14,7 @@
     "source": {
       "repoURL": "https://github.com/optiplex331/Halligalli-infrastructure.git",
       "targetRevision": "main",
-      "path": "targets/aks/gitops/charts/halligalli",
+      "path": "targets/aks/gitops/halligalli",
       "helm": {
         "valueFiles": ["values/aks.values.json"]
       }

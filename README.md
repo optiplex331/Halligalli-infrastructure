@@ -40,7 +40,7 @@ terraform -chdir=targets/container-apps/terraform validate -no-color
 terraform -chdir=targets/aks/terraform fmt -check -recursive
 terraform -chdir=targets/aks/terraform init -backend=false -input=false
 terraform -chdir=targets/aks/terraform validate -no-color
-helm lint targets/aks/gitops/charts/halligalli --values targets/aks/gitops/charts/halligalli/values/aks.values.json
+helm lint targets/aks/gitops/halligalli --values targets/aks/gitops/halligalli/values/aks.values.json
 helm lint targets/aks/gitops/observability --values targets/aks/gitops/observability/values/aks.values.json
 ```
 

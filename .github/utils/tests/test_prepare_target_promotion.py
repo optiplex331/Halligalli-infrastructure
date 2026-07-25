@@ -214,7 +214,7 @@ class PrepareTargetPromotionTest(unittest.TestCase):
         self.assertEqual(
             outputs,
             {
-                "desired_state_path=targets/aks/gitops/charts/halligalli/values/aks.values.json",
+                "desired_state_path=targets/aks/gitops/halligalli/values/aks.values.json",
                 "promotion_branch=automation/aks-promotion",
                 "commit_message=chore(aks): promote Halligalli v1.2.3",
                 "commit=" + "a" * 40,
