@@ -45,6 +45,11 @@ CAPACITY = (QUOTA_FAMILY, VCPUS_PER_NODE)
 
 
 class ValidateAksPreflightTest(unittest.TestCase):
+    def assert_rejections(self, cases) -> None:
+        for name, operation, pattern in cases:
+            with self.subTest(case=name), self.assertRaisesRegex(AksPreflightError, pattern):
+                operation()
+
     def test_accepts_available_approved_target(self) -> None:
         self.assertEqual(
             validate_subscription({"id": "expected", "name": "Demo", "state": "Enabled"}, "expected"),
@@ -70,113 +75,102 @@ class ValidateAksPreflightTest(unittest.TestCase):
         target_path = Path(__file__).resolve().parents[3] / "targets/aks/terraform/target.json"
         self.assertEqual(load_target_facts(target_path), TARGET)
 
-    def test_rejects_extra_target_facts(self) -> None:
+    def test_rejects_invalid_target_facts(self) -> None:
+        cases = (
+            (
+                "unsupported derived fact",
+                '{"region":"northeurope","nodeSku":"Standard_D4ls_v6",'
+                '"nodeCount":2,"kubernetesVersion":"1.36.1","requiredVcpus":8}',
+                "unsupported requiredVcpus",
+            ),
+            (
+                "incomplete Kubernetes version",
+                '{"region":"northeurope","nodeSku":"Standard_D4ls_v6",'
+                '"nodeCount":2,"kubernetesVersion":"1.36"}',
+                "full version",
+            ),
+        )
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "target.json"
-            path.write_text(
-                '{"region":"northeurope",'
-                '"nodeSku":"Standard_D4ls_v6","nodeCount":2,'
-                '"kubernetesVersion":"1.36.1",'
-                '"requiredVcpus":8}',
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(AksPreflightError, "unsupported requiredVcpus"):
-                load_target_facts(path)
+            for index, (name, raw_target, pattern) in enumerate(cases):
+                with self.subTest(case=name):
+                    path = Path(directory) / f"target-{index}.json"
+                    path.write_text(raw_target, encoding="utf-8")
+                    with self.assertRaisesRegex(AksPreflightError, pattern):
+                        load_target_facts(path)
 
-    def test_changed_terraform_target_cannot_silently_pass_old_sku_evidence(self) -> None:
+    def test_rejects_invalid_subscriptions(self) -> None:
+        self.assert_rejections(
+            (
+                ("unexpected subscription", lambda: validate_subscription({"id": "other", "state": "Enabled"}, "expected"), "does not match"),
+                ("disabled subscription", lambda: validate_subscription({"id": "expected", "state": "Disabled"}, "expected"), "not enabled"),
+            )
+        )
+
+    def test_rejects_invalid_skus(self) -> None:
         changed_target = {**TARGET, "nodeSku": "Standard_D2ls_v6"}
-        with self.assertRaisesRegex(AksPreflightError, "Standard_D2ls_v6"):
-            validate_sku(
-                {
-                    "value": [
-                        {
-                            "name": "Standard_D4ls_v6",
-                            "locations": ["northeurope"],
-                            "restrictions": [],
-                            "family": "StandardDlsv6Family",
-                            "capabilities": [{"name": "vCPUs", "value": "4"}],
-                        }
-                    ]
-                },
-                changed_target,
+        restricted_sku = {"value": [{**SKU["value"][0], "restrictions": [{"type": "Location"}]}]}
+        self.assert_rejections(
+            (
+                ("target SKU has no matching evidence", lambda: validate_sku(SKU, changed_target), "Standard_D2ls_v6"),
+                ("SKU is subscription-restricted", lambda: validate_sku(restricted_sku, TARGET), "restricted"),
             )
+        )
 
-    def test_rejects_malformed_target_kubernetes_version(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "target.json"
-            path.write_text(
-                '{"region":"northeurope",'
-                '"nodeSku":"Standard_D4ls_v6","nodeCount":2,'
-                '"kubernetesVersion":"1.36"}',
-                encoding="utf-8",
+    def test_rejects_invalid_quotas(self) -> None:
+        self.assert_rejections(
+            (
+                (
+                    "family quota is insufficient",
+                    lambda: validate_quota(
+                        [
+                            {"name": {"value": "cores"}, "currentValue": 0, "limit": 20},
+                            {"name": {"value": QUOTA_FAMILY}, "currentValue": 1, "limit": 8},
+                        ], TARGET, quota_family=QUOTA_FAMILY, vcpus_per_node=VCPUS_PER_NODE
+                    ),
+                    "fewer than 8",
+                ),
+                (
+                    "required cores quota is absent",
+                    lambda: validate_quota(
+                        [{"name": {"value": QUOTA_FAMILY}, "currentValue": 0, "limit": 8}],
+                        TARGET, quota_family=QUOTA_FAMILY, vcpus_per_node=VCPUS_PER_NODE
+                    ),
+                    "Required Azure quota cores was not returned",
+                ),
             )
-            with self.assertRaisesRegex(AksPreflightError, "full version"):
-                load_target_facts(path)
+        )
 
-    def test_rejects_wrong_subscription(self) -> None:
-        with self.assertRaisesRegex(AksPreflightError, "does not match"):
-            validate_subscription({"id": "other", "state": "Enabled"}, "expected")
-
-    def test_rejects_restricted_sku(self) -> None:
-        with self.assertRaisesRegex(AksPreflightError, "restricted"):
-            validate_sku(
-                {"value": [{
-                    "name": "Standard_D4ls_v6",
-                    "locations": ["northeurope"],
-                    "restrictions": [{"type": "Location"}],
-                    "family": "StandardDlsv6Family",
-                    "capabilities": [{"name": "vCPUs", "value": "4"}],
-                }]},
-                TARGET,
+    def test_rejects_invalid_kubernetes_version_responses(self) -> None:
+        self.assert_rejections(
+            (
+                (
+                    "target patch is unavailable",
+                    lambda: validate_kubernetes_version(
+                        {"values": [{"version": "1.36", "patchVersions": {}}]}, TARGET["kubernetesVersion"], TARGET
+                    ),
+                    "not offered",
+                ),
+                (
+                    "patch in unrelated response field is ignored",
+                    lambda: validate_kubernetes_version(
+                        {"note": "1.36.1", "values": [{"version": "1.36", "patchVersions": {}}]}, TARGET["kubernetesVersion"], TARGET
+                    ),
+                    "not offered",
+                ),
+                (
+                    "version response has no values list",
+                    lambda: validate_kubernetes_version({}, TARGET["kubernetesVersion"], TARGET),
+                    "value list",
+                ),
+                (
+                    "version entry has malformed patch versions",
+                    lambda: validate_kubernetes_version(
+                        {"values": [{"version": "1.35", "patchVersions": {"1.35.5": {}}}, {"version": "1.36", "patchVersions": []}]}, TARGET["kubernetesVersion"], TARGET
+                    ),
+                    "entry is malformed",
+                ),
             )
-
-    def test_rejects_insufficient_family_quota(self) -> None:
-        with self.assertRaisesRegex(AksPreflightError, "fewer than 8"):
-            validate_quota(
-                [
-                    {"name": {"value": "cores"}, "currentValue": 0, "limit": 20},
-                    {"name": {"value": "StandardDlsv6Family"}, "currentValue": 1, "limit": 8},
-                ],
-                TARGET,
-                quota_family=QUOTA_FAMILY,
-                vcpus_per_node=VCPUS_PER_NODE,
-            )
-
-    def test_rejects_unavailable_kubernetes_patch(self) -> None:
-        with self.assertRaisesRegex(AksPreflightError, "not offered"):
-            validate_kubernetes_version(
-                {"values": [{"version": "1.36", "patchVersions": {}}]},
-                TARGET["kubernetesVersion"],
-                TARGET,
-            )
-
-    def test_rejects_patch_found_only_in_an_unrelated_field(self) -> None:
-        with self.assertRaisesRegex(AksPreflightError, "not offered"):
-            validate_kubernetes_version(
-                {
-                    "note": "1.36.1",
-                    "values": [{"version": "1.36", "patchVersions": {}}],
-                },
-                TARGET["kubernetesVersion"],
-                TARGET,
-            )
-
-    def test_rejects_malformed_kubernetes_version_response(self) -> None:
-        with self.assertRaisesRegex(AksPreflightError, "value list"):
-            validate_kubernetes_version({}, TARGET["kubernetesVersion"], TARGET)
-
-    def test_rejects_malformed_kubernetes_version_entry(self) -> None:
-        with self.assertRaisesRegex(AksPreflightError, "entry is malformed"):
-            validate_kubernetes_version(
-                {
-                    "values": [
-                        {"version": "1.35", "patchVersions": {"1.35.5": {}}},
-                        {"version": "1.36", "patchVersions": []},
-                    ]
-                },
-                TARGET["kubernetesVersion"],
-                TARGET,
-            )
+        )
 
     def test_writes_backend_config_for_the_selected_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -187,10 +181,22 @@ class ValidateAksPreflightTest(unittest.TestCase):
                 'organization = "example-org"\n\nworkspaces {\n  name = "aks"\n}\n',
             )
 
-    def test_rejects_backend_config_injection(self) -> None:
+    def test_rejects_unsafe_backend_config_names(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(AksPreflightError, "unsupported characters"):
-                write_backend_config(Path(directory) / "backend.hcl", 'example"', "aks")
+            self.assert_rejections(
+                (
+                    (
+                        "organization contains quote",
+                        lambda: write_backend_config(Path(directory) / "organization.hcl", 'example"', "aks"),
+                        "unsupported characters",
+                    ),
+                    (
+                        "workspace contains path separator",
+                        lambda: write_backend_config(Path(directory) / "workspace.hcl", "example-org", "aks/prod"),
+                        "unsupported characters",
+                    ),
+                )
+            )
 
 
 if __name__ == "__main__":
