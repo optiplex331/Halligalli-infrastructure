@@ -21,6 +21,26 @@ Terraform root, GitOps applications, charts and values, target scripts, and
 sanitized validation evidence there. The targets intentionally have different
 internal structures because they use different delivery models.
 
+## AKS runtime topology
+
+The AKS runtime routes public Web, REST, and WebSocket traffic through the
+NGINX Ingress controller. The API uses the in-cluster Redis service for
+ephemeral state and sends traces to the observability stack in a separate
+namespace.
+
+```mermaid
+flowchart LR
+    Client["User / Browser"] --> Ingress["NGINX Ingress"]
+    Ingress -->|"/"| WebSvc["halligalli-web:80"]
+    Ingress -->|"/api/v1, /ws/v1"| ApiSvc["halligalli-api:80"]
+    WebSvc --> Web["Web Pods ×2"]
+    ApiSvc --> API["API Pods ×2"]
+    API --> RedisSvc["halligalli-redis:6379"]
+    RedisSvc --> Redis["Redis Pod ×1"]
+    API --> Collector["OTel Collector\nacross namespaces"]
+    Prometheus["Prometheus"] -->|"/internal/metrics"| API
+```
+
 ## Delivery controls
 
 - `main` accepts changes through pull requests, requires the static validation check, requires resolved review conversations, and rejects force-pushes and deletion.
