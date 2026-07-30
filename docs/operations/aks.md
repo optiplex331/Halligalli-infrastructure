@@ -106,34 +106,36 @@ HALLIGALLI_ORBSTACK_APPROVED=1 \
 targets/aks/scripts/orbstack-integration.sh
 ```
 
-The helper checks runtime and observability rollouts, verifies every current
-Ready Web/API Pod image digest, checks Ingress, Secrets, NetworkPolicies,
-Prometheus and Tempo query paths, and exercises same-origin HTTPS behavior.
+The helper requires its disposable namespace to be absent before it starts,
+verifies every current Ready Web/API Pod image digest, and exercises
+same-origin HTTPS behavior through Ingress. It deletes the namespace when the
+smoke exits.
 It explicitly disables the runtime chart's cert-manager resources and uses a
 short-lived locally generated self-signed TLS Secret, so it does not validate
-cert-manager, ACME, public DNS, or public certificate trust.
-Use its `--help` output and source as the command contract. It does not prove
-multi-node scheduling, Pod disruption, AKS networking, cloud DNS/TLS, Argo CD,
-or Azure cost and teardown.
+the observability chart, cert-manager, ACME, public DNS, or public certificate
+trust.
+It does not prove multi-node scheduling, Pod disruption, AKS networking, cloud
+DNS/TLS, Argo CD, or Azure cost and teardown.
 
 ## Approval-gated preflight
 
-An approved AKS Validation Run uses one ignored local operation configuration
-and one preflight command:
+An approved AKS Validation Run uses ignored local operation and backend
+configurations plus one preflight command:
 
 ```bash
 cp targets/aks/terraform/local-operation.env.example targets/aks/terraform/local-operation.env
-# Fill every field and record explicit approval in the ignored file.
+cp targets/aks/terraform/backend.hcl.example targets/aks/terraform/backend.hcl
+# Select the subscription, record explicit approval, and configure the reviewed
+# HCP Terraform organization and workspace in the ignored files.
 targets/aks/scripts/aks-validation-preflight.sh
 ```
 
-The script verifies the exact selected subscription, the fixed target region,
-node SKU, checked-in Kubernetes patch, and available quota.
-It trusts the reviewed `main` desired state that already passed static PR
-validation, initializes the configured remote backend, and saves a Terraform
-create plan under ignored `.local/` output. Review the saved plan and abort on
-any mismatch. The script performs no cloud mutation, but its credentialed
-reads and remote plan still require the operation approval described above.
+The script verifies that the exact selected subscription is enabled, trusts the
+reviewed `main` desired state that already passed static PR validation,
+initializes the configured remote backend, and saves a Terraform create plan
+under ignored `.local/` output. Review the saved plan and abort on any mismatch.
+The script performs no cloud mutation, but its credentialed subscription read
+and remote plan still require the operation approval described above.
 
 ## cert-manager and public TLS
 
