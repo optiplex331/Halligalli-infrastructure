@@ -55,8 +55,9 @@ The independent observability target runs one Prometheus, one OpenTelemetry
 Collector, and one Tempo Pod in `halligalli-observability`. Prometheus scrapes
 `halligalli-api:80/internal/metrics`; the API sends OTLP HTTP traces to the
 Collector, which forwards them to Tempo. Prometheus and Tempo retain data in
-`emptyDir` storage, with a four-hour retention setting and no PVC or external
-monitoring database. The Services are ClusterIP-only and have no public route.
+`emptyDir` storage with no PVC or external monitoring database; the data is
+ephemeral and is lost when the Pod or host is replaced. The Services are
+ClusterIP-only and have no public route.
 
 During an approved local check, access them only through port-forwarding:
 
