@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: halligalli-api
+  labels:
+    app.kubernetes.io/part-of: halligalli
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: halligalli
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.replicas.api }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: halligalli
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: halligalli
+        app.kubernetes.io/component: api
+    spec:
+      serviceAccountName: halligalli-runtime
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: "{{ .Values.apiImage.repository }}@{{ .Values.apiImage.digest }}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              value: "http://halligalli-observability-collector.halligalli-observability.svc.cluster.local:4318/v1/traces"
+          command: ["/bin/sh", "-c"]
+          args:
+            - >-
+              REDIS_USERNAME="$(cat /redis-auth/username)";
+              REDIS_PASSWORD="$(cat /redis-auth/password)";
+              export HALLIGALLI_REDIS_URL="redis://${REDIS_USERNAME}:${REDIS_PASSWORD}@halligalli-redis:6379/0";
+              exec uvicorn halligalli_api.app:app --host 0.0.0.0 --port 8000 --workers 1
+          volumeMounts:
+            - name: redis-auth
+              mountPath: /redis-auth
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /internal/ready
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /internal/identity
+              port: http
+          resources:
+{{- toYaml .Values.resources.api | nindent 12 }}
+      volumes:
+        - name: redis-auth
+          secret:
+            secretName: {{ .Values.redisAuthSecretName | quote }}

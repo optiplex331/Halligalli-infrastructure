@@ -1,0 +1,8 @@
+apiVersion: v2
+name: halligalli-k3s-runtime
+description: Halligalli paired Web, FastAPI, and ephemeral Redis runtime for K3s.
+type: application
+version: 0.1.0
+home: https://k3s.halligalli.games
+sources:
+  - https://github.com/optiplex331/Halligalli-BossYang

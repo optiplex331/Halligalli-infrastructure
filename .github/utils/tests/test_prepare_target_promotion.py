@@ -86,6 +86,7 @@ class PrepareTargetPromotionTest(unittest.TestCase):
         for target, expected_marker in (
             ("aks", "AKS Deployment Target"),
             ("container-apps", "container-apps Live Demo Environment"),
+            ("k3s", "K3s Deployment Target"),
         ):
             with self.subTest(target=target):
                 promotion = self.prepare_fixture(target)
@@ -106,8 +107,10 @@ class PrepareTargetPromotionTest(unittest.TestCase):
                         {"deploymentEnabled", "webImage", "apiImage", "redisImage"},
                     )
                     self.assertTrue(promoted["deploymentEnabled"])
-                else:
+                elif target == "aks":
                     self.assertEqual(promoted["ingress"]["host"], "proof.invalid")
+                else:
+                    self.assertEqual(promoted["replicas"], {"web": 2, "api": 2})
 
         manifest = self.load_fixture("paired-release-manifest.json")
         manifest["runtimeIdentity"] = {"version": "unused", "commit": "unused"}

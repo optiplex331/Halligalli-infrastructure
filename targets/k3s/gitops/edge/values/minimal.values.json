@@ -1,0 +1,14 @@
+{
+  "cloudflaredImage": {
+    "repository": "cloudflare/cloudflared",
+    "digest": "sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d"
+  },
+  "replicas": 1,
+  "resources": {
+    "requests": {"cpu": "50m", "memory": "64Mi", "ephemeral-storage": "64Mi"},
+    "limits": {"cpu": "250m", "memory": "128Mi", "ephemeral-storage": "256Mi"}
+  },
+  "tunnel": {
+    "secretName": "halligalli-tunnel"
+  }
+}

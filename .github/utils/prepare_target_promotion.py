@@ -26,6 +26,11 @@ TARGETS = {
         "promotion_branch": "automation/container-apps-promotion",
         "display_name": "container-apps Live Demo Environment",
     },
+    "k3s": {
+        "desired_state_path": "targets/k3s/gitops/runtime/values/experiment.values.json",
+        "promotion_branch": "automation/k3s-promotion",
+        "display_name": "K3s Deployment Target",
+    },
 }
 
 

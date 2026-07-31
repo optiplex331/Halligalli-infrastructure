@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["webImage", "apiImage", "redisImage", "replicas", "resources", "redisAuthSecretName"],
+  "properties": {
+    "webImage": {"$ref": "#/definitions/image"},
+    "apiImage": {"$ref": "#/definitions/image"},
+    "redisImage": {"$ref": "#/definitions/image"},
+    "replicas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["web", "api"],
+      "properties": {
+        "web": {"type": "integer", "minimum": 1},
+        "api": {"type": "integer", "minimum": 1}
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["web", "api", "redis"],
+      "properties": {
+        "web": {"$ref": "#/definitions/resources"},
+        "api": {"$ref": "#/definitions/resources"},
+        "redis": {"$ref": "#/definitions/resources"}
+      }
+    },
+    "redisAuthSecretName": {"type": "string", "minLength": 1}
+  },
+  "definitions": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "digest"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requests", "limits"],
+      "properties": {
+        "requests": {"$ref": "#/definitions/resourceValues"},
+        "limits": {"$ref": "#/definitions/resourceValues"}
+      }
+    },
+    "resourceValues": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu", "memory"],
+      "properties": {
+        "cpu": {"type": "string", "minLength": 1},
+        "memory": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

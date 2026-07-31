@@ -1,0 +1,5 @@
+organization = "replace-with-terraform-organization"
+
+workspaces {
+  name = "halligalli-k3s"
+}
