@@ -43,8 +43,6 @@ spec:
         app.kubernetes.io/component: tempo
     spec:
       serviceAccountName: halligalli-observability
-      tolerations:
-{{- toYaml .Values.tolerations | nindent 8 }}
       securityContext:
         runAsNonRoot: true
         seccompProfile:

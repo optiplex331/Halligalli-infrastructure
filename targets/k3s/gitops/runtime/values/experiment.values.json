@@ -11,9 +11,6 @@
     "repository": "redis",
     "digest": "sha256:62b5498c91778f738f0efbf0a6fd5b434011235a3e7b5f2ed4a2c0c63bb1c786"
   },
-  "tolerations": [
-    {"key": "mlops.local/gpu", "operator": "Exists", "effect": "NoSchedule"}
-  ],
   "replicas": {
     "web": 2,
     "api": 2

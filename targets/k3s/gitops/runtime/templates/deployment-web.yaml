@@ -25,8 +25,6 @@ spec:
         app.kubernetes.io/component: web
     spec:
       serviceAccountName: halligalli-runtime
-      tolerations:
-{{- toYaml .Values.tolerations | nindent 8 }}
       securityContext:
         runAsNonRoot: true
         seccompProfile:
