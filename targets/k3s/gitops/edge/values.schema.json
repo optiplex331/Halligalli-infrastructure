@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cloudflaredImage", "replicas", "resources", "tunnel"],
+  "properties": {
+    "cloudflaredImage": {"$ref": "#/definitions/image"},
+    "replicas": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2
+    },
+    "resources": {"$ref": "#/definitions/resources"},
+    "tunnel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["secretName"],
+      "properties": {
+        "secretName": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "definitions": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "digest"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requests", "limits"],
+      "properties": {
+        "requests": {"$ref": "#/definitions/resourceValues"},
+        "limits": {"$ref": "#/definitions/resourceValues"}
+      }
+    },
+    "resourceValues": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu", "memory", "ephemeral-storage"],
+      "properties": {
+        "cpu": {"type": "string", "minLength": 1},
+        "memory": {"type": "string", "minLength": 1},
+        "ephemeral-storage": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

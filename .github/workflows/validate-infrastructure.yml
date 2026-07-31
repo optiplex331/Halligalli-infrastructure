@@ -45,21 +45,29 @@ jobs:
         run: |
           terraform -chdir=targets/container-apps/terraform fmt -check -recursive
           terraform -chdir=targets/aks/terraform fmt -check -recursive
+          terraform -chdir=targets/k3s/terraform fmt -check -recursive
 
       - name: Terraform init without backend
         run: |
           terraform -chdir=targets/container-apps/terraform init -backend=false -input=false
           terraform -chdir=targets/aks/terraform init -backend=false -input=false
+          terraform -chdir=targets/k3s/terraform init -backend=false -input=false
 
       - name: Terraform validate
         run: |
           terraform -chdir=targets/container-apps/terraform validate -no-color
           terraform -chdir=targets/aks/terraform validate -no-color
+          terraform -chdir=targets/k3s/terraform validate -no-color
 
       - name: Validate Helm charts and values
         run: |
           helm lint targets/aks/gitops/halligalli --values targets/aks/gitops/halligalli/values/aks.values.json
           helm lint targets/aks/gitops/observability --values targets/aks/gitops/observability/values/aks.values.json
+          helm lint targets/k3s/gitops/runtime --values targets/k3s/gitops/runtime/values/experiment.values.json
+          helm lint targets/k3s/gitops/runtime --values targets/k3s/gitops/runtime/values/minimal.values.json
+          helm lint targets/k3s/gitops/observability --values targets/k3s/gitops/observability/values/k3s.values.json
+          helm lint targets/k3s/gitops/edge --values targets/k3s/gitops/edge/values/experiment.values.json
+          helm lint targets/k3s/gitops/edge --values targets/k3s/gitops/edge/values/minimal.values.json
           if helm template halligalli-orbstack targets/aks/gitops/halligalli \
             --namespace halligalli \
             --values targets/aks/gitops/halligalli/values/aks.values.json \

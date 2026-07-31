@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: halligalli-k3s
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: halligalli
+    app.kubernetes.io/managed-by: infrastructure
+spec:
+  description: Halligalli resources on the shared K3s Deployment Target.
+  sourceRepos:
+    - https://github.com/optiplex331/Halligalli-infrastructure.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: halligalli
+    - server: https://kubernetes.default.svc
+      namespace: halligalli-observability
+    - server: https://kubernetes.default.svc
+      namespace: halligalli-edge
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: apps
+      kind: Deployment
+    - group: networking.k8s.io
+      kind: NetworkPolicy

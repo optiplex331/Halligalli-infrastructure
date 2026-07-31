@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: halligalli-redis
+  labels:
+    app.kubernetes.io/part-of: halligalli
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: halligalli
+    app.kubernetes.io/component: redis
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: halligalli
+      app.kubernetes.io/component: redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: halligalli
+        app.kubernetes.io/component: redis
+    spec:
+      serviceAccountName: halligalli-runtime
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: redis
+          image: "{{ .Values.redisImage.repository }}@{{ .Values.redisImage.digest }}"
+          command: ["/bin/sh", "-c"]
+          args: ["exec redis-server --save '' --appendonly no --aclfile /etc/redis/users.acl"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            tcpSocket:
+              port: redis
+          livenessProbe:
+            tcpSocket:
+              port: redis
+          resources:
+{{- toYaml .Values.resources.redis | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: redis-acl
+              mountPath: /etc/redis
+              readOnly: true
+      initContainers:
+        - name: render-acl
+          image: "{{ .Values.redisImage.repository }}@{{ .Values.redisImage.digest }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - >-
+              username="$(cat /redis-auth/username)";
+              password="$(cat /redis-auth/password)";
+              printf '%s\n%s\n' "user default off" "user ${username} on >${password} ~halligalli:room:* ~halligalli:entry:* &halligalli:room:*:snapshots +ping +hello +client|setinfo +get +set +hget +hset +expire +watch +unwatch +multi +exec +discard +publish +psubscribe +punsubscribe +scan" > /redis-acl/users.acl
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: redis-auth
+              mountPath: /redis-auth
+              readOnly: true
+            - name: redis-acl
+              mountPath: /redis-acl
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: redis-auth
+          secret:
+            secretName: {{ .Values.redisAuthSecretName | quote }}
+        - name: redis-acl
+          emptyDir: {}

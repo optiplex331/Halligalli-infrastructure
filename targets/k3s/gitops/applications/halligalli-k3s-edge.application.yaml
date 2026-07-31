@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: halligalli-k3s-edge
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: halligalli-k3s-edge
+    app.kubernetes.io/part-of: halligalli-k3s
+spec:
+  project: halligalli-k3s
+  source:
+    repoURL: https://github.com/optiplex331/Halligalli-infrastructure.git
+    targetRevision: main
+    path: targets/k3s/gitops/edge
+    helm:
+      valueFiles:
+        - values/experiment.values.json
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: halligalli-edge
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

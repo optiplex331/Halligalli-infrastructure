@@ -1,0 +1,8 @@
+apiVersion: v2
+name: halligalli-k3s-observability
+description: Ephemeral metrics and traces stack for the K3s Deployment Target.
+type: application
+version: 0.1.0
+home: https://k3s.halligalli.games
+sources:
+  - https://github.com/optiplex331/Halligalli-BossYang

@@ -1,6 +1,9 @@
 # Halligalli Infrastructure
 
-Public infrastructure repository for two explicit deployment targets: `container-apps`, the public Live Demo Environment, and `aks`, a maintained deployment-capable target. Neither target is called Production.
+Public infrastructure repository for three explicit deployment targets:
+`container-apps`, the public Live Demo Environment; `aks`, a maintained
+deployment-capable target; and `k3s`, the shared-host target. None is called
+Production.
 
 ## Ownership
 
@@ -12,8 +15,9 @@ This repository owns Terraform, target-specific Deployment Desired State, indepe
 |---|---|---|
 | `container-apps` | Continuously available Live Demo at `play.halligalli.games` | PR-gated desired state with an explicitly approved local Terraform apply |
 | `aks` | Maintained deployment-capable target | Target-scoped promotion and Argo CD GitOps reconciliation during approved validation runs |
+| `k3s` | Single-node target on the shared Linux host | Local SSH API access and target-owned desired state |
 
-Development Images are diagnostic only and cannot enter either formal promotion lane. One promotion changes exactly one target's desired-state file.
+Development Images are diagnostic only and cannot enter any formal promotion lane. One promotion changes exactly one target's desired-state file.
 
 Target-owned implementation lives under `targets/<target>/`. Container Apps
 owns its Deployment Desired State and Terraform root there. AKS owns its
@@ -60,14 +64,23 @@ terraform -chdir=targets/container-apps/terraform validate -no-color
 terraform -chdir=targets/aks/terraform fmt -check -recursive
 terraform -chdir=targets/aks/terraform init -backend=false -input=false
 terraform -chdir=targets/aks/terraform validate -no-color
+terraform -chdir=targets/k3s/terraform fmt -check -recursive
+terraform -chdir=targets/k3s/terraform init -backend=false -input=false
+terraform -chdir=targets/k3s/terraform validate -no-color
 helm lint targets/aks/gitops/halligalli --values targets/aks/gitops/halligalli/values/aks.values.json
 helm lint targets/aks/gitops/observability --values targets/aks/gitops/observability/values/aks.values.json
+helm lint targets/k3s/gitops/runtime --values targets/k3s/gitops/runtime/values/experiment.values.json
+helm lint targets/k3s/gitops/runtime --values targets/k3s/gitops/runtime/values/minimal.values.json
+helm lint targets/k3s/gitops/observability --values targets/k3s/gitops/observability/values/k3s.values.json
+helm lint targets/k3s/gitops/edge --values targets/k3s/gitops/edge/values/experiment.values.json
+helm lint targets/k3s/gitops/edge --values targets/k3s/gitops/edge/values/minimal.values.json
+bash -n targets/k3s/scripts/k3s-operator.sh
 ```
 
 These commands are static validation only. Never use a cloud apply as validation.
 
-The only operational runbooks are [Container Apps Live Demo](docs/operations/container-apps.md)
-and [AKS Deployment Target](docs/operations/aks.md). Executable desired state owns
-current release, platform, resource, and dependency selections. Future completed
+The operational runbooks are [Container Apps Live Demo](docs/operations/container-apps.md),
+[AKS Deployment Target](docs/operations/aks.md), and [K3s Deployment Target](docs/operations/k3s.md).
+Executable desired state owns current release, platform, resource, and dependency selections. Future completed
 AKS run facts live only in dated files under `targets/aks/evidence/`; the existing
 `targets/aks/evidence/validation-summary.json` is an immutable historical exception.

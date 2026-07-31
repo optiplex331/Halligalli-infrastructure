@@ -1,0 +1,26 @@
+name: Target Promotion - K3s
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Formal paired Halligalli Release Tag to validate and propose
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  attestations: read
+
+concurrency:
+  group: k3s-release-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Propose K3s Deployment Desired State
+    uses: ./.github/workflows/propose-target-promotion.yml
+    with:
+      target: k3s
+      release_tag: ${{ inputs.release_tag }}

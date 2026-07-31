@@ -1,0 +1,28 @@
+{
+  "prometheusImage": {
+    "repository": "prom/prometheus",
+    "digest": "sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893"
+  },
+  "collectorImage": {
+    "repository": "otel/opentelemetry-collector-contrib",
+    "digest": "sha256:125bdbeb7590cc1952c5b3430ecf14063568980c2c93d5b38676cc0446ed8108"
+  },
+  "tempoImage": {
+    "repository": "grafana/tempo",
+    "digest": "sha256:cda87c212d8c584dc0b89e337e7ed648a5100feb657e5d528480ee4fa03dbbe3"
+  },
+  "resources": {
+    "prometheus": {
+      "requests": {"cpu": "50m", "memory": "128Mi", "ephemeral-storage": "256Mi"},
+      "limits": {"cpu": "200m", "memory": "256Mi", "ephemeral-storage": "2Gi"}
+    },
+    "collector": {
+      "requests": {"cpu": "25m", "memory": "64Mi", "ephemeral-storage": "64Mi"},
+      "limits": {"cpu": "200m", "memory": "192Mi", "ephemeral-storage": "256Mi"}
+    },
+    "tempo": {
+      "requests": {"cpu": "50m", "memory": "128Mi", "ephemeral-storage": "256Mi"},
+      "limits": {"cpu": "250m", "memory": "256Mi", "ephemeral-storage": "2Gi"}
+    }
+  }
+}

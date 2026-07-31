@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["prometheusImage", "collectorImage", "tempoImage", "resources"],
+  "properties": {
+    "prometheusImage": {"$ref": "#/definitions/image"},
+    "collectorImage": {"$ref": "#/definitions/image"},
+    "tempoImage": {"$ref": "#/definitions/image"},
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prometheus", "collector", "tempo"],
+      "properties": {
+        "prometheus": {"$ref": "#/definitions/resources"},
+        "collector": {"$ref": "#/definitions/resources"},
+        "tempo": {"$ref": "#/definitions/resources"}
+      }
+    }
+  },
+  "definitions": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "digest"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requests", "limits"],
+      "properties": {
+        "requests": {"$ref": "#/definitions/resourceValues"},
+        "limits": {"$ref": "#/definitions/resourceValues"}
+      }
+    },
+    "resourceValues": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu", "memory", "ephemeral-storage"],
+      "properties": {
+        "cpu": {"type": "string", "minLength": 1},
+        "memory": {"type": "string", "minLength": 1},
+        "ephemeral-storage": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
