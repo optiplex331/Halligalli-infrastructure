@@ -101,9 +101,6 @@ data:
         otlp:
           protocols:
             http:
-    compactor:
-      compaction:
-        block_retention: 4h
     storage:
       trace:
         backend: local
