@@ -40,6 +40,16 @@ class PrepareTargetPromotionTest(unittest.TestCase):
             ),
         )
 
+    def test_target_metadata_points_to_existing_desired_state(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        for target, metadata in TARGETS.items():
+            with self.subTest(target=target):
+                desired_state_path = repo_root / metadata["desired_state_path"]
+                self.assertTrue(
+                    desired_state_path.is_file(),
+                    f"missing desired state for {target}: {desired_state_path}",
+                )
+
     def run_cli(
         self,
         target: str,

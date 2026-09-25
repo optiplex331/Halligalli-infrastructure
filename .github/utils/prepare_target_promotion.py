@@ -22,7 +22,7 @@ TARGETS = {
         "display_name": "AKS Deployment Target",
     },
     "container-apps": {
-        "desired_state_path": "targets/container-apps/desired-state.json",
+        "desired_state_path": "targets/container-apps/terraform/desired-state.json",
         "promotion_branch": "automation/container-apps-promotion",
         "display_name": "container-apps Live Demo Environment",
     },
