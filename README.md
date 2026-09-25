@@ -48,7 +48,7 @@ flowchart LR
 ## Delivery controls
 
 - `main` accepts changes through pull requests, requires the static validation check, requires resolved review conversations, and rejects force-pushes and deletion.
-- Promotion workflows establish paired Web/API release trust once by verifying the release binding and GitHub artifact provenance before opening target-scoped Draft PRs. Reviewers decide deployment intent, target scope, and operational blockers; later deployment checks do not repeat release provenance. The workflows cannot merge those PRs.
+- Promotion workflows establish paired Web/API release trust once by verifying the release binding and GitHub artifact provenance before opening target-scoped Draft PRs. Reviewers decide deployment intent, target scope, and operational blockers; later deployment checks do not repeat release provenance. The workflows cannot merge those PRs. This repository does not let GitHub Actions create pull requests, so a run pushes `automation/<target>-promotion` and then fails at PR creation; the operator opens the PR from that branch.
 - Container Apps deployment is deliberately not executed by GitHub Actions. Terraform consumes the checked-in target desired state directly; the operator reviews a saved local plan, explicitly approves its apply, and immediately runs the read-only public smoke described in the [Container Apps runbook](docs/operations/container-apps.md).
 - No Azure credential, user refresh token, service-principal secret, or publish profile is stored in GitHub.
 - Actions are restricted to GitHub-owned and verified publishers plus explicitly allowlisted repositories. Every referenced action is pinned to a full commit SHA.

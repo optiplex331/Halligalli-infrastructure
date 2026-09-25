@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "runDate": "2026-09-25",
+  "operation": "promotion",
+  "fromRelease": "v0.7.2",
+  "release": {
+    "releaseTag": "v0.9.0",
+    "productCommit": "55446161c05e45db1190c6259b3b145b2842ba90",
+    "webDigest": "sha256:5686e4177d31deb4382d2bf573230bf582931c14ee320532a7c6f76c7322e791",
+    "apiDigest": "sha256:da16ebc713a0d21b969032ea4e895aa4a8fe44207b04b790aaaedcc3dc7efaa2"
+  },
+  "infrastructureCommit": "447556e094f5e6303820d9c241fbe9608c30d18e",
+  "runtime": {
+    "kubernetes": "v1.32.6+k3s1",
+    "readyNodes": 1,
+    "webReplicas": 2,
+    "apiReplicas": 2
+  },
+  "checks": {
+    "preflight": "passed",
+    "argoApplicationsSyncedHealthy": "passed",
+    "runningPodDigests": "passed",
+    "internalRuntimeSmoke": "passed",
+    "publicSmoke": "passed"
+  },
+  "incidents": [
+    {
+      "step": "internalRuntimeSmoke",
+      "error": "API NoPermissionError on zrangebyscore; room creation returned 500",
+      "cause": "Redis ACL did not allow the v0.9.0 due and active room sorted sets",
+      "resolution": "Infrastructure PR #40 extended the K3s and AKS Redis ACL; both smokes passed after Argo CD synced it"
+    }
+  ],
+  "retention": {
+    "rawEvidencePublished": false
+  }
+}
