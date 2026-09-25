@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: halligalli-aks-platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: aks
+    app.kubernetes.io/managed-by: infrastructure
+spec:
+  description: Pinned cert-manager platform dependency on the AKS Deployment Target.
+  sourceRepos:
+    - https://charts.jetstack.io
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: cert-manager
+    # cert-manager keeps its leader-election Roles in kube-system by default.
+    - server: https://kubernetes.default.svc
+      namespace: kube-system
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: apps
+      kind: Deployment
+    - group: batch
+      kind: Job
+    - group: rbac.authorization.k8s.io
+      kind: Role
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
