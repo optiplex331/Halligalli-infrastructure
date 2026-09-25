@@ -99,15 +99,17 @@ The Applications track `main`, so the deployed Web/API pair is the one in
    ```
 
 3. Create the Cloudflare Tunnel with Terraform (see
-   [Cloudflare Tunnel boundary](#cloudflare-tunnel-boundary)), review the saved
-   plan, and apply it only after explicit approval:
+   [Cloudflare Tunnel boundary](#cloudflare-tunnel-boundary)). The
+   `halligalli-k3s` HCP Terraform workspace uses remote execution: plans and
+   applies run in HCP, the Cloudflare account, zone, and scoped token are
+   workspace variables (the token is sensitive), and a local saved plan file is
+   not supported. Review the remote plan and confirm the apply only after
+   explicit approval:
 
    ```bash
-   set -a; source targets/k3s/terraform/local-operation.env; set +a
    terraform -chdir=targets/k3s/terraform init -backend-config=backend.hcl
-   terraform -chdir=targets/k3s/terraform plan -out=k3s-cloudflare.tfplan
-   terraform -chdir=targets/k3s/terraform show k3s-cloudflare.tfplan
-   terraform -chdir=targets/k3s/terraform apply k3s-cloudflare.tfplan
+   terraform -chdir=targets/k3s/terraform plan
+   terraform -chdir=targets/k3s/terraform apply
    ```
 
 4. Create the operation-time Tunnel Secret from the sensitive Terraform
@@ -261,15 +263,16 @@ the internal `halligalli-web:80` ClusterIP service. No Kubernetes Ingress,
 public TLS resource, API route, Argo CD route, Prometheus route, or Tempo route
 is created.
 
-Keep the Terraform backend and Cloudflare operation file local:
+Keep the Terraform backend and operation approval file local:
 
 ```bash
 cp targets/k3s/terraform/backend.hcl.example targets/k3s/terraform/backend.hcl
 cp targets/k3s/terraform/local-operation.env.example targets/k3s/terraform/local-operation.env
 ```
 
-The plan must be reviewed before a separate, explicitly approved apply. The
-plan and backend may contain sensitive state references and stay outside Git.
+The remote plan must be reviewed before the apply is confirmed. The backend
+file and any run output with state references stay outside Git; Cloudflare
+inputs live only as HCP workspace variables.
 The Terraform token output is sensitive and belongs only in protected state
 and the operation-time Tunnel Secret.
 
