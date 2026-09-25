@@ -72,10 +72,11 @@ kubectl -n halligalli-observability port-forward \
 
 The target reuses the existing Argo CD installation. The files under
 `targets/k3s/gitops/applications/` define one `halligalli-k3s` AppProject and
-separate runtime and observability Applications. The Project accepts only the
-Infrastructure repository, permits destinations in `halligalli`,
-`halligalli-observability`, and `halligalli-edge`, and permits no cluster-scoped
-resources. Both Applications enable prune and self-heal for their own
+three separate Applications: runtime, observability, and edge. The Project
+accepts only the Infrastructure repository, permits destinations in
+`halligalli`, `halligalli-observability`, and `halligalli-edge`, and permits
+only the Namespace cluster-scoped resource that `CreateNamespace=true` needs.
+All three Applications enable prune and self-heal for their own
 namespace-scoped charts.
 
 Create the operation-time Redis Secret before the runtime Application is first

@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/name: cert-manager
     app.kubernetes.io/part-of: aks
 spec:
-  project: default
+  project: halligalli-aks-platform
   source:
     repoURL: https://charts.jetstack.io
     chart: cert-manager

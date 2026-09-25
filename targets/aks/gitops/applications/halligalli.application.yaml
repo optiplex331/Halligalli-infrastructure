@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/name: halligalli
     app.kubernetes.io/part-of: aks
 spec:
-  project: default
+  project: halligalli-aks
   source:
     repoURL: https://github.com/optiplex331/Halligalli-infrastructure.git
     targetRevision: main

@@ -5,6 +5,14 @@ Demo Environment, and checked-in desired state does not claim that an AKS
 workload exists. This runbook is the single operational reference for the
 target and for an explicitly approved AKS Validation Run.
 
+The AKS Promoted Baseline is the Paired Release selected by the merged runtime
+desired state in `targets/aks/gitops/halligalli/values/aks.values.json`. No
+AKS cluster runs today, so that baseline is proven only by static validation.
+The Deployment-Verified Baseline is the last Paired Release proven by completed
+AKS evidence: `v0.7.2`, from the 2026-07-13 run. It stays at `v0.7.2` until a
+later approved AKS Validation Run succeeds, even when promotions advance the
+Promoted Baseline.
+
 The immutable, sanitized summary under `targets/aks/evidence/` is the sole owner of the
 last completed run's release, dependency, platform, capability, and destruction
 facts. Raw output and sensitive or identifying operation data stay outside Git.
@@ -20,8 +28,16 @@ Technical preflight derives per-node vCPU capacity and quota family from the
 matched Azure SKU response before checking quota; these derived facts must not be
 duplicated in prose or local configuration.
 
-Argo CD owns the cert-manager, runtime, and observability Applications. The
-cert-manager Application consumes a pinned upstream Helm chart and installs the
+Argo CD owns the cert-manager, runtime, and observability Applications. None
+of them uses the `default` project. The `halligalli-aks` AppProject accepts
+only the Infrastructure repository, permits destinations in `halligalli` and
+`halligalli-observability`, and permits only the Namespace and cert-manager
+`ClusterIssuer` cluster-scoped resources plus the namespaced kinds the runtime
+and observability charts render. The separate `halligalli-aks-platform`
+AppProject accepts only the pinned Jetstack chart repository and permits the
+`cert-manager` namespace, the cert-manager leader-election Roles in
+`kube-system`, and the CRD, webhook, and RBAC cluster resources that
+cert-manager installs. The cert-manager Application consumes a pinned upstream Helm chart and installs the
 cert-manager CRDs and controllers into the `cert-manager` namespace. The
 runtime and observability Applications use Infrastructure-owned Chart sources
 and Values files relative to those Charts. The runtime desired state owns the
@@ -174,15 +190,18 @@ the public HTTPS path is verified, change `tls.clusterIssuer` to
 `letsencrypt-prod` through a separate reviewed desired-state change. Do not
 switch issuers with a live `kubectl patch`.
 
-After the controllers and Argo CD are bootstrapped, apply the cert-manager
-Application first and wait for its CRDs and deployments:
+After the controllers and Argo CD are bootstrapped, apply both AppProjects,
+then apply the cert-manager Application first and wait for its CRDs and
+deployments.
 
 Do not bulk-apply the files in `targets/aks/gitops/applications/`; the
-cert-manager Application must become Healthy before the runtime Application is
-created. The Application sync-wave annotations also preserve this order when a
+AppProjects must exist before their Applications, and the cert-manager
+Application must become Healthy before the runtime Application is created. The Application sync-wave annotations also preserve this order when a
 parent Argo CD Application manages these child Applications.
 
 ```bash
+kubectl apply -f targets/aks/gitops/applications/halligalli-aks-platform.project.yaml
+kubectl apply -f targets/aks/gitops/applications/halligalli-aks.project.yaml
 kubectl apply -f targets/aks/gitops/applications/cert-manager.application.yaml
 kubectl -n argocd wait --for=jsonpath='{.status.sync.status}'=Synced \
   application/cert-manager --timeout=600s
@@ -336,4 +355,7 @@ secret-bearing manifests.
 
 The existing completed summary is historical and remains unchanged; its fields
 describe only what that run executed and must not be reinterpreted as evidence
-for the current charts or a later journey contract.
+for the current charts or a later journey contract. In particular, its Grafana
+digest, its Grafana observability entry, and its `dashboardLogTrace` check
+describe the observability stack at that `v0.7.2` run. Grafana was removed from
+the AKS charts afterward and does not exist in the current AKS desired state.
