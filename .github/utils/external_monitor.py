@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dependency-free public HTTPS and WebSocket availability checks."""
+"""Dependency-free public HTTPS, WebSocket, and release identity checks."""
 
 from __future__ import annotations
 
@@ -7,9 +7,20 @@ import argparse
 import base64
 import hashlib
 import http.client
+import json
 import os
 import ssl
+import urllib.request
+from pathlib import Path
+from typing import Any, Callable
 from urllib.parse import urlparse
+
+DESIRED_STATE_PATH = Path(__file__).resolve().parents[2] / "targets" / "container-apps" / "terraform" / "desired-state.json"
+MANIFEST_URL = "https://github.com/optiplex331/Halligalli-BossYang/releases/download/v{version}/paired-release-manifest.json"
+
+
+class ReleaseIdentityError(RuntimeError):
+    """Raised when the running release cannot be matched to the desired state."""
 
 
 def check_https(origin: str) -> None:
@@ -39,13 +50,61 @@ def check_websocket(origin: str, path: str) -> None:
         raise RuntimeError(f"WebSocket handshake returned {response.status}")
 
 
+def fetch_json(url: str) -> Any:
+    request = urllib.request.Request(url, headers={"Accept": "application/json", "Cache-Control": "no-cache", "User-Agent": "halligalli-live-demo-monitor"})
+    with urllib.request.urlopen(request, timeout=10, context=ssl.create_default_context()) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def verify_release_identity(identity: Any, manifest: Any, desired_state: Any) -> None:
+    """Match the running Web identity, via its Paired Release Manifest, to the desired Web/API digests."""
+    if not isinstance(identity, dict) or not isinstance(identity.get("version"), str) or not isinstance(identity.get("commit"), str):
+        raise ReleaseIdentityError("running release identity must contain string version and commit values")
+    try:
+        manifest_identity = manifest["runtimeIdentity"]
+        released = {role: manifest["images"][role]["digest"] for role in ("web", "api")}
+        desired = {"web": desired_state["webImage"]["digest"], "api": desired_state["apiImage"]["digest"]}
+    except (KeyError, TypeError):
+        raise ReleaseIdentityError("Paired Release Manifest or desired state is missing release identity fields") from None
+    running = {"version": identity["version"], "commit": identity["commit"]}
+    if manifest.get("releaseTag") != f"v{running['version']}" or manifest_identity != running:
+        raise ReleaseIdentityError(f"Paired Release Manifest does not describe running release {running}")
+    for role in ("web", "api"):
+        if released[role] != desired[role]:
+            raise ReleaseIdentityError(
+                f"running release v{running['version']} {role} digest {released[role]} differs from desired state {desired[role]}"
+            )
+
+
+def check_release_identity(
+    origin: str,
+    desired_state_path: Path = DESIRED_STATE_PATH,
+    fetch: Callable[[str], Any] = fetch_json,
+) -> None:
+    desired_state = json.loads(desired_state_path.read_text(encoding="utf-8"))
+    try:
+        identity = fetch(f"{origin.rstrip('/')}/internal/identity")
+    except (OSError, ValueError) as error:
+        raise ReleaseIdentityError(f"cannot read running release identity: {error}") from error
+    version = identity.get("version") if isinstance(identity, dict) else None
+    if not isinstance(version, str):
+        raise ReleaseIdentityError("running release identity must contain a string version")
+    try:
+        manifest = fetch(MANIFEST_URL.format(version=version))
+    except (OSError, ValueError) as error:
+        raise ReleaseIdentityError(f"cannot read Paired Release Manifest for v{version}: {error}") from error
+    verify_release_identity(identity, manifest, desired_state)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--origin", default="https://play.halligalli.games")
     parser.add_argument("--websocket-path", default="/ws/v1/rooms/monitor")
+    parser.add_argument("--desired-state", type=Path, default=DESIRED_STATE_PATH)
     args = parser.parse_args()
     check_https(args.origin)
     check_websocket(args.origin, args.websocket_path)
+    check_release_identity(args.origin, args.desired_state)
 
 
 if __name__ == "__main__":

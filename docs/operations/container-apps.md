@@ -71,7 +71,7 @@ terraform -chdir=targets/container-apps/terraform plan -out=container-apps.tfpla
 terraform -chdir=targets/container-apps/terraform show container-apps.tfplan
 ```
 
-Only after the saved plan has been reviewed and explicitly approved, run the apply and the existing read-only public HTTPS/WebSocket smoke as one operation:
+Only after the saved plan has been reviewed and explicitly approved, run the apply and the existing read-only public HTTPS/WebSocket and release identity smoke as one operation:
 
 ```bash
 terraform -chdir=targets/container-apps/terraform apply container-apps.tfplan && python3 .github/utils/external_monitor.py --origin https://play.halligalli.games
@@ -91,8 +91,14 @@ Single revision delivery does not retain manual traffic weights or provide an im
 
 `Monitor Live Demo` runs a read-only public HTTPS and WebSocket uptime check every
 hour and may also be dispatched manually. The workflow owns its exact
-schedule. Either check failing
-fails the workflow directly; the repository does not create or maintain a
+schedule. The same run reads the public Web `/internal/identity`, downloads the
+public Paired Release Manifest for that version, and requires the manifest's
+runtime identity to match and its Web/API digests to equal
+`targets/container-apps/terraform/desired-state.json` on `main`. Only the Web
+identity is public, so the API side is matched through the paired manifest
+rather than a direct API request. A merged promotion that has not yet been
+applied therefore fails the monitor until the approved apply runs. Any check
+failing fails the workflow directly; the repository does not create or maintain a
 GitHub Issue incident for uptime failures.
 
 The scheduled check is a basic public availability signal, not a deployment gate.

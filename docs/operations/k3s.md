@@ -241,11 +241,12 @@ kubectl --context "$HALLIGALLI_K3S_CONTEXT" -n halligalli-observability \
 
 The target reuses the existing Argo CD installation. The files under
 `targets/k3s/gitops/applications/` define one `halligalli-k3s` AppProject and
-three Applications: runtime, observability, and edge. The Project accepts only
-the Infrastructure repository, permits destinations in `halligalli`,
-`halligalli-observability`, and `halligalli-edge`, and permits no
-cluster-scoped resources. All three Applications enable prune and self-heal
-for their own namespace-scoped charts.
+three separate Applications: runtime, observability, and edge. The Project
+accepts only the Infrastructure repository, permits destinations in
+`halligalli`, `halligalli-observability`, and `halligalli-edge`, and permits
+only the Namespace cluster-scoped resource that `CreateNamespace=true` needs.
+All three Applications enable prune and self-heal for their own
+namespace-scoped charts.
 
 Secret values are not part of the charts, Application manifests, or Git
 history; the Redis and Tunnel Secrets are created at operation time, so Argo
