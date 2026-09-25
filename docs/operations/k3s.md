@@ -1,53 +1,222 @@
 # K3s Deployment Target
 
 K3s is a single-node Deployment Target on the existing shared Linux host.
-The cluster also runs an LLM service. Halligalli must stay inside its own
-namespaces and must not change the host-owned K3s add-ons or the LLM workload.
+The cluster also runs an LLM service. Halligalli owns only its three
+namespaces (`halligalli`, `halligalli-observability`, `halligalli-edge`), the
+`halligalli-k3s` AppProject and its three Applications, the Cloudflare Tunnel
+resources, the operation-time Secrets, and sanitized evidence. It must not
+change the host, the K3s installation, the shared K3s add-ons, the shared
+Argo CD installation, or the LLM workload.
 
-## Access boundary
+Every step below that talks to the host, the cluster, Cloudflare, or Terraform
+state is an operator-run operation that needs explicit local approval. Static
+validation in the README does not authorize or prove a deployment.
 
-The Kubernetes API is not a public application route. The local operator uses
-the host's SSH access and forwards local port `16443` to the host-local K3s
-API on port `6443`. The copied admin kubeconfig is stored only under ignored
-local state. It must never be committed, sent to CI, printed, or included in
-shared notes.
+## Prerequisites
 
-Set the host-owned values in an ignored file:
+The host owner provides these before Halligalli is deployed:
+
+- a Ready single-node K3s cluster with its default add-ons;
+- a shared Argo CD installation in the `argocd` namespace that can pull the
+  public Infrastructure repository;
+- SSH access from the operator machine to the host;
+- the comma-separated list of LLM namespaces that Halligalli must not touch.
+
+The operator machine needs `kubectl`, `ssh`, `curl`, `python3`, `terraform`,
+and `openssl`, plus a Terraform backend and a scoped Cloudflare token for the
+Tunnel.
+
+## Access
+
+The Kubernetes API is not a public application route. The operator forwards
+local port `16443` over SSH to the host-local K3s API on port `6443` and uses
+a context in their own kubeconfig (`KUBECONFIG` or `~/.kube/config`) whose
+cluster server is `https://127.0.0.1:16443`. The scripts select that context
+with `--context`; they never copy, write, or print kubeconfig contents, and
+they do not change the current context. Adding the context to the operator's
+kubeconfig is the operator's own one-time setup; keep it out of this
+repository, CI, and shared notes.
+
+Set the host-owned values in the ignored operator file:
 
 ```bash
 cp targets/k3s/operator.env.example targets/k3s/operator.env
-# Fill in the SSH target and the explicit protected LLM namespace inventory.
+# Fill in the context, SSH target, and protected LLM namespace inventory.
 ```
 
-Use three local terminals for the operator path:
+Keep the API forward open in its own terminal. It exits when the SSH session
+is lost:
 
 ```bash
-targets/k3s/scripts/k3s-operator.sh sync-kubeconfig
-targets/k3s/scripts/k3s-operator.sh port-forward
-targets/k3s/scripts/k3s-operator.sh preflight
+targets/k3s/scripts/k3s-access.sh port-forward
 ```
 
-`sync-kubeconfig` performs one read-only SSH copy and rewrites the copied API
-endpoint to `127.0.0.1:<local-port>`. `port-forward` stays attached to the
-SSH session and exits if that session is lost. `preflight` records the K3s
-version, Argo CD namespace state, `kube-system` add-ons, the explicit LLM
-namespace inventory, node capacity, and free disk at the K3s data path under
-ignored `.local/k3s/` state.
+In the working terminal, load the operator values so the commands below can
+use the context, then confirm that the context reaches the API only through a
+loopback address:
 
-The preflight also checks that the configured public origin is HTTPS and does
-not select port `6443`. Public application routing belongs to the later
-Cloudflare Tunnel target; the Kubernetes API remains local through SSH.
+```bash
+set -a; source targets/k3s/operator.env; set +a
+targets/k3s/scripts/k3s-access.sh check
+```
 
-After the runtime has been reconciled, an approved local smoke can verify the
-internal Web/API/Redis path without changing the AKS target:
+## Preflight
+
+```bash
+targets/k3s/scripts/k3s-preflight.sh
+```
+
+The preflight is read-only. It checks the local tools, the loopback context,
+the Kubernetes server version, Ready node count, the shared Argo CD namespace
+and CRDs, permission to create Applications, the protected LLM namespace
+inventory (which must exist and must not overlap a Halligalli namespace),
+whether the Halligalli namespaces already exist, and free disk at the K3s data
+path. It does not install or upgrade K3s or Argo CD, apply resources, change
+add-ons, restart workloads, or touch the LLM service. Stop if it fails.
+
+## First deployment
+
+The Applications track `main`, so the deployed Web/API pair is the one in
+`targets/k3s/gitops/runtime/values/experiment.values.json` on `main`.
+
+1. Create the Halligalli namespaces. Creating them here keeps the AppProject
+   free of cluster-scoped permissions; the Applications' `CreateNamespace`
+   option then finds them present.
+
+   ```bash
+   for namespace in halligalli halligalli-observability halligalli-edge; do
+     kubectl --context "$HALLIGALLI_K3S_CONTEXT" create namespace "$namespace" \
+       --dry-run=client -o yaml |
+       kubectl --context "$HALLIGALLI_K3S_CONTEXT" apply -f -
+   done
+   ```
+
+2. Create the operation-time Redis Secret. The script generates a random
+   password, never prints it, and leaves an existing Secret unchanged:
+
+   ```bash
+   HALLIGALLI_OPERATION_APPROVED=1 targets/k3s/scripts/apply-redis-auth-secret.sh
+   ```
+
+3. Create the Cloudflare Tunnel with Terraform (see
+   [Cloudflare Tunnel boundary](#cloudflare-tunnel-boundary)), review the saved
+   plan, and apply it only after explicit approval:
+
+   ```bash
+   set -a; source targets/k3s/terraform/local-operation.env; set +a
+   terraform -chdir=targets/k3s/terraform init -backend-config=backend.hcl
+   terraform -chdir=targets/k3s/terraform plan -out=k3s-cloudflare.tfplan
+   terraform -chdir=targets/k3s/terraform show k3s-cloudflare.tfplan
+   terraform -chdir=targets/k3s/terraform apply k3s-cloudflare.tfplan
+   ```
+
+4. Create the operation-time Tunnel Secret from the sensitive Terraform
+   output. `HALLIGALLI_OPERATION_APPROVED=1` must be set in the ignored
+   `local-operation.env`:
+
+   ```bash
+   targets/k3s/scripts/apply-tunnel-secret.sh
+   ```
+
+5. Apply the AppProject, then the three Applications:
+
+   ```bash
+   kubectl --context "$HALLIGALLI_K3S_CONTEXT" apply \
+     -f targets/k3s/gitops/applications/halligalli-k3s.project.yaml
+   kubectl --context "$HALLIGALLI_K3S_CONTEXT" apply \
+     -f targets/k3s/gitops/applications/halligalli-k3s-runtime.application.yaml \
+     -f targets/k3s/gitops/applications/halligalli-k3s-observability.application.yaml \
+     -f targets/k3s/gitops/applications/halligalli-k3s-edge.application.yaml
+   ```
+
+6. Wait until all three Applications are `Synced` and `Healthy`:
+
+   ```bash
+   kubectl --context "$HALLIGALLI_K3S_CONTEXT" -n argocd get \
+     applications.argoproj.io halligalli-k3s-runtime \
+     halligalli-k3s-observability halligalli-k3s-edge
+   ```
+
+Then run the checks below.
+
+## Checks
+
+The internal runtime smoke port-forwards the Web and API Services, checks
+readiness, both release identities, and API metrics, and creates one ephemeral
+test room through the Web proxy. It prints the Web/API identities and does not
+print or save the room credential:
 
 ```bash
 targets/k3s/scripts/k3s-runtime-smoke.sh
 ```
 
-The smoke uses local service port-forwards, checks Web and API health surfaces,
-and creates one ephemeral test room through the Web proxy. It does not expose
-or save the response credential.
+Prove that every Ready Web/API Pod runs the digest pair selected in Git:
+
+```bash
+python3 .github/utils/verify_running_pod_digests.py \
+  --context "$HALLIGALLI_K3S_CONTEXT" \
+  --namespace halligalli \
+  --values targets/k3s/gitops/runtime/values/experiment.values.json
+```
+
+The public smoke is the only public-route check. It verifies HTTPS, the REST
+proxy, and a WebSocket handshake through the Tunnel:
+
+```bash
+targets/k3s/scripts/k3s-public-smoke.sh
+```
+
+## Promotion and rollback
+
+`Target Promotion - K3s` validates the Product repository's schema-V2 Paired
+Release Manifest and artifact provenance, then proposes a Draft PR changing
+only `targets/k3s/gitops/runtime/values/experiment.values.json`. It always
+updates the Web/API digest pair together. Development Images, mutable tags,
+and one-image selections are not eligible. After the PR is merged, Argo CD
+reconciles it; run the three checks above.
+
+Rollback is a reviewed Git revert, never a live change. Revert the promotion
+commit in a pull request so the same values file returns to the previously
+accepted complete Web/API pair:
+
+```bash
+git switch -c revert/k3s-<release> origin/main
+git revert <promotion-commit>
+```
+
+After the revert PR is merged and the runtime Application is `Synced` and
+`Healthy`, run the three checks above. Do not use `kubectl set image`,
+`kubectl rollout undo`, or an independent Web or API rollback; Argo CD
+self-heal would undo them.
+
+## Evidence to hand back
+
+After a deployment, promotion, or rollback, save the following to ignored
+local state (for example `.local/k3s/evidence/`) and hand it back so it can be
+committed later as sanitized K3s evidence:
+
+- the UTC date and the operation (first deployment, promotion, or rollback);
+- the Infrastructure commit on `main` (`git rev-parse origin/main`) and the
+  Web/API digests in `experiment.values.json`;
+- the full `k3s-preflight.sh` output;
+- the `Synced`/`Healthy` status table of the three Applications from step 6;
+- the success line of `verify_running_pod_digests.py`;
+- the `k3s-runtime-smoke.sh` output, including the Web and API identities;
+- the `k3s-public-smoke.sh` output;
+- any failed step, with its error message and what was done about it.
+
+Do not include kubeconfigs, non-loopback API server addresses, SSH targets,
+node names, IP addresses, private host names, tokens, Secret values,
+Terraform plans or state, room codes, or raw `kubectl describe` or log dumps.
+Review every line before handing it back.
+
+## Removing Halligalli
+
+Removal is an approved operation that touches only Halligalli resources.
+Delete the three Applications and the AppProject, then the three Halligalli
+namespaces. The Applications have no resource finalizer, so deleting the
+namespaces removes the workloads and the operation-time Secrets. Destroying
+the Cloudflare Tunnel is a separate, reviewed Terraform operation.
 
 ## Observability boundary
 
@@ -62,26 +231,26 @@ ClusterIP-only and have no public route.
 During an approved local check, access them only through port-forwarding:
 
 ```bash
-kubectl -n halligalli-observability port-forward \
-  service/halligalli-observability-prometheus 19090:9090
-kubectl -n halligalli-observability port-forward \
-  service/halligalli-observability-tempo 13200:3200
+kubectl --context "$HALLIGALLI_K3S_CONTEXT" -n halligalli-observability \
+  port-forward service/halligalli-observability-prometheus 19090:9090
+kubectl --context "$HALLIGALLI_K3S_CONTEXT" -n halligalli-observability \
+  port-forward service/halligalli-observability-tempo 13200:3200
 ```
 
 ## Shared Argo CD boundary
 
 The target reuses the existing Argo CD installation. The files under
 `targets/k3s/gitops/applications/` define one `halligalli-k3s` AppProject and
-separate runtime and observability Applications. The Project accepts only the
-Infrastructure repository, permits destinations in `halligalli`,
-`halligalli-observability`, and `halligalli-edge`, and permits no cluster-scoped
-resources. Both Applications enable prune and self-heal for their own
-namespace-scoped charts.
+three Applications: runtime, observability, and edge. The Project accepts only
+the Infrastructure repository, permits destinations in `halligalli`,
+`halligalli-observability`, and `halligalli-edge`, and permits no
+cluster-scoped resources. All three Applications enable prune and self-heal
+for their own namespace-scoped charts.
 
-Create the operation-time Redis Secret before the runtime Application is first
-reconciled. Secret values are not part of the chart, Application manifests, or
-Git history. The later Tunnel Secret follows the same boundary. Never add the
-LLM namespace or shared K3s add-ons to this Project.
+Secret values are not part of the charts, Application manifests, or Git
+history; the Redis and Tunnel Secrets are created at operation time, so Argo
+CD neither renders nor prunes them. Never add an LLM namespace or a shared K3s
+add-on to this Project.
 
 ## Cloudflare Tunnel boundary
 
@@ -96,40 +265,23 @@ Keep the Terraform backend and Cloudflare operation file local:
 ```bash
 cp targets/k3s/terraform/backend.hcl.example targets/k3s/terraform/backend.hcl
 cp targets/k3s/terraform/local-operation.env.example targets/k3s/terraform/local-operation.env
-terraform -chdir=targets/k3s/terraform init -backend-config=backend.hcl
-terraform -chdir=targets/k3s/terraform plan -out=k3s-cloudflare.tfplan
-terraform -chdir=targets/k3s/terraform show k3s-cloudflare.tfplan
 ```
 
 The plan must be reviewed before a separate, explicitly approved apply. The
 plan and backend may contain sensitive state references and stay outside Git.
-
-The Terraform token output is sensitive and belongs only in protected state.
-After an approved Terraform apply, create the operation-time Kubernetes Secret
-and then let the edge Application reconcile:
-
-```bash
-targets/k3s/scripts/apply-tunnel-secret.sh
-```
+The Terraform token output is sensitive and belongs only in protected state
+and the operation-time Tunnel Secret.
 
 The edge chart runs `cloudflared` in `halligalli-edge` with two replicas in the
 experiment profile and one in minimal. It has no Service; both replicas make
-outbound Tunnel connections and route only to `halligalli-web:80`. The Secret
-is external to GitOps, so Argo CD does not render or prune its value.
-
-After Cloudflare and the edge workload are healthy, the read-only public smoke
-checks HTTPS, the REST proxy, and a WebSocket handshake:
-
-```bash
-targets/k3s/scripts/k3s-public-smoke.sh
-```
+outbound Tunnel connections and route only to `halligalli-web:80`.
 
 ## Approved experiment flow
 
 Run this flow only with explicit local approval for each disruptive Kubernetes
-or host operation. Keep the synced kubeconfig, command output, room codes,
-credentials, and raw cluster details in ignored local state; do not copy them
-into Git or shared notes.
+or host operation. Keep command output, room codes, credentials, and raw
+cluster details in ignored local state; do not copy them into Git or shared
+notes.
 
 1. Record the reviewed profile, current Web/API/Redis and `cloudflared` Pod
    images, replica counts, Argo Application health, and the internal/public
@@ -148,7 +300,8 @@ into Git or shared notes.
    and confirm the reviewed replica/image state is restored. Remove the test
    drift only through the reconciler or the approved desired state.
 
-Useful checks for the approved run are:
+Useful checks for the approved run, each with
+`--context "$HALLIGALLI_K3S_CONTEXT"`, are:
 
 ```bash
 kubectl -n halligalli get deploy,pods,svc -o wide
@@ -159,72 +312,24 @@ kubectl -n argocd get applications.argoproj.io halligalli-k3s-runtime \
   halligalli-k3s-observability halligalli-k3s-edge
 ```
 
-The public smoke is the only public-route check. The Kubernetes API, Argo CD,
-Prometheus, and Tempo remain accessible only through the SSH port-forward or
-other approved local access path.
+The Kubernetes API, Argo CD, Prometheus, and Tempo remain accessible only
+through the SSH port-forward or another approved local access path.
 
-## Host restart and rebuild flow
-
-The host owner may verify a planned shutdown and restart only as a separately
-approved operation. Before shutdown, record the same bounded status above;
-after startup, reconnect through SSH, resync the kubeconfig, restore the local
-port-forward, run the read-only preflight, wait for shared add-ons and Argo CD,
-and repeat the internal/public smoke. No step exposes Kubernetes API port
-`6443` publicly.
-
-A full rebuild starts from these inputs:
-
-- the host and K3s installation procedure, including the reviewed K3s version;
-- the shared K3s add-on and Argo CD bootstrap owned by the host operator;
-- protected Terraform backend configuration and Cloudflare state;
-- operation-time Cloudflare, Redis, and Tunnel Secret values;
-- the reviewed Infrastructure commit, K3s Helm values, and Argo Applications.
-
-Restore the host and shared components first, then run the SSH preflight. Next
-restore or reconcile the Cloudflare Tunnel, create the operation-time Secrets,
-and let Argo CD create the three Halligalli namespaces and reconcile runtime,
-observability, and edge. Finish with the internal and public smoke and record
-only sanitized results. A rebuild does not recover Redis rooms or historical
-traces.
-
-## Paired promotion and rollback
-
-`Target Promotion - K3s` validates the Product repository's schema-V2 Paired
-Release Manifest and artifact provenance, then proposes a Draft PR changing
-only `targets/k3s/gitops/runtime/values/experiment.values.json`. It always
-updates the Web/API digest pair together. Development Images, mutable tags,
-and one-image selections are not eligible.
-
-Argo CD reconciles the reviewed desired-state change. Rollback is a reviewed
-Git change that restores a previously accepted complete Web/API pair in the
-same K3s values file; it does not use `kubectl set image`, `rollout undo`, or
-an independent Web/API rollback. After reconciliation, run the internal and
-public smoke commands above.
-
-## Protected shared state
-
-The following remain outside Halligalli ownership:
-
-- the existing K3s Traefik, ServiceLB, and local-path-provisioner components;
-- the LLM namespaces and their workloads;
-- the single-node host and its K3s installation.
-
-The preflight is read-only. It does not install or upgrade K3s or Argo CD,
-apply Kubernetes resources, change add-ons, restart workloads, or alter the
-LLM service. Any remote mutation requires separate explicit local approval.
-
-## Shutdown, backup, and rebuild boundary
+## Host restart and rebuild
 
 This target has one K3s node and makes no node-level high-availability claim.
 Host shutdown or restart interrupts Halligalli, observability, Argo CD, and
-the shared LLM service; verify recovery only during an explicitly approved
-operation. K3s uses its embedded SQLite datastore with no backup commitment.
-Redis room state is ephemeral and is expected to be lost after Redis or host
-loss.
+the shared LLM service. K3s uses its embedded SQLite datastore with no backup
+commitment. Redis room state is ephemeral and is lost after Redis or host
+loss. There is no fixed RTO.
+
+After an approved restart, restore the SSH port-forward, run the preflight,
+wait for the shared add-ons and Argo CD, and repeat the checks. No step
+exposes Kubernetes API port `6443` publicly.
 
 A rebuild is an approved operator procedure, not an automatic recovery
-promise. It requires the documented host/K3s installation inputs, the shared
-Argo CD bootstrap, operation-time Redis and Tunnel Secrets, reviewed
-Halligalli desired state, and the public Cloudflare configuration. A rebuild
-must restore the shared-host boundary before Halligalli resources are
-reconciled. There is no fixed RTO.
+promise. The host owner first restores the host, K3s, the shared add-ons, and
+Argo CD. Halligalli then needs the protected Terraform backend and Cloudflare
+state, new operation-time Redis and Tunnel Secrets, and the reviewed
+Infrastructure commit; repeat [First deployment](#first-deployment) from the
+preflight. A rebuild does not recover Redis rooms or historical traces.
