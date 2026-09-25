@@ -74,7 +74,12 @@ helm lint targets/k3s/gitops/runtime --values targets/k3s/gitops/runtime/values/
 helm lint targets/k3s/gitops/observability --values targets/k3s/gitops/observability/values/k3s.values.json
 helm lint targets/k3s/gitops/edge --values targets/k3s/gitops/edge/values/experiment.values.json
 helm lint targets/k3s/gitops/edge --values targets/k3s/gitops/edge/values/minimal.values.json
-bash -n targets/k3s/scripts/k3s-operator.sh
+bash -n targets/k3s/scripts/apply-redis-auth-secret.sh
+bash -n targets/k3s/scripts/apply-tunnel-secret.sh
+bash -n targets/k3s/scripts/k3s-access.sh
+bash -n targets/k3s/scripts/k3s-preflight.sh
+bash -n targets/k3s/scripts/k3s-public-smoke.sh
+bash -n targets/k3s/scripts/k3s-runtime-smoke.sh
 ```
 
 These commands are static validation only. Never use a cloud apply as validation.

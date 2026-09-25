@@ -16,16 +16,11 @@ source "$operation_config"
 : "${HALLIGALLI_K3S_CONTEXT:?Set HALLIGALLI_K3S_CONTEXT in targets/k3s/operator.env.}"
 
 state_dir="${HALLIGALLI_K3S_STATE_DIR:-$repo_root/.local/k3s}"
-kubeconfig_path="$state_dir/admin.kubeconfig"
 web_port=18080
 api_port=18000
-[[ -f "$kubeconfig_path" ]] || die "Run k3s-operator.sh sync-kubeconfig first."
-
-command -v curl >/dev/null 2>&1 || die "Required command not found: curl"
-command -v kubectl >/dev/null 2>&1 || die "Required command not found: kubectl"
 
 kube() {
-  KUBECONFIG="$kubeconfig_path" kubectl --context "$HALLIGALLI_K3S_CONTEXT" "$@"
+  kubectl --context "$HALLIGALLI_K3S_CONTEXT" "$@"
 }
 
 smoke_dir="$state_dir/smoke"
@@ -58,8 +53,11 @@ wait_for() {
 
 wait_for "http://127.0.0.1:$web_port/"
 wait_for "http://127.0.0.1:$api_port/internal/ready"
-curl --fail --silent --show-error "http://127.0.0.1:$web_port/internal/identity" >/dev/null
-curl --fail --silent --show-error "http://127.0.0.1:$api_port/internal/metrics" | grep -q 'halligalli_http_requests_total'
+web_identity="$(curl --fail --silent --show-error "http://127.0.0.1:$web_port/internal/identity")"
+api_identity="$(curl --fail --silent --show-error "http://127.0.0.1:$api_port/internal/identity")"
+api_metrics="$(curl --fail --silent --show-error "http://127.0.0.1:$api_port/internal/metrics")"
+[[ "$api_metrics" == *halligalli_http_requests_total* ]] ||
+  die "The API metrics surface did not expose halligalli_http_requests_total."
 
 response="$(curl --fail --silent --show-error \
   -X POST "http://127.0.0.1:$web_port/api/v1/rooms" \
@@ -68,4 +66,6 @@ response="$(curl --fail --silent --show-error \
   -d '{"name":"K3s smoke","credentialVerifier":"0000000000000000000000000000000000000000000000000000000000000000","tableSeatCount":4,"targetHumanParticipantCount":2,"difficulty":"normal","durationSec":60}')"
 [[ "$response" == *'"roomCode"'* ]] || die "The Web/API/Redis smoke did not create a room."
 
+echo "Web identity: $web_identity"
+echo "API identity: $api_identity"
 echo "K3s internal runtime smoke passed for Web, API, and ephemeral Redis."

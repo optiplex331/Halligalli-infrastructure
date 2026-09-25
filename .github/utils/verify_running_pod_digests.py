@@ -78,8 +78,9 @@ def verify_pods(payloads: dict[str, dict[str, Any]], expected: dict[str, str]) -
                 raise PodDigestError(f"{component} Pod {name} runs {actual}, expected {expected[component]}")
 
 
-def kubectl(*args: str) -> str:
-    return subprocess.run(["kubectl", *args], check=True, text=True, capture_output=True).stdout
+def kubectl(*args: str, context: str | None = None) -> str:
+    prefix = ["kubectl", "--context", context] if context else ["kubectl"]
+    return subprocess.run([*prefix, *args], check=True, text=True, capture_output=True).stdout
 
 
 def main() -> None:
@@ -87,13 +88,14 @@ def main() -> None:
     parser.add_argument("--values", type=Path, required=True)
     parser.add_argument("--namespace", required=True)
     parser.add_argument("--rollout-timeout", default="180s")
+    parser.add_argument("--context", help="kubeconfig context; defaults to the current context")
     args = parser.parse_args()
     try:
         selected = expected_digests(json.loads(args.values.read_text(encoding="utf-8")))
         payloads: dict[str, dict[str, Any]] = {}
         for component in COMPONENTS:
-            kubectl("-n", args.namespace, "rollout", "status", f"deployment/halligalli-{component}", f"--timeout={args.rollout_timeout}")
-            payloads[component] = json.loads(kubectl("-n", args.namespace, "get", "pods", "-l", f"app.kubernetes.io/name=halligalli,app.kubernetes.io/component={component}", "-o", "json"))
+            kubectl("-n", args.namespace, "rollout", "status", f"deployment/halligalli-{component}", f"--timeout={args.rollout_timeout}", context=args.context)
+            payloads[component] = json.loads(kubectl("-n", args.namespace, "get", "pods", "-l", f"app.kubernetes.io/name=halligalli,app.kubernetes.io/component={component}", "-o", "json", context=args.context))
         verify_pods(payloads, selected)
     except (OSError, json.JSONDecodeError, subprocess.CalledProcessError, PodDigestError) as error:
         print(error, file=sys.stderr)
