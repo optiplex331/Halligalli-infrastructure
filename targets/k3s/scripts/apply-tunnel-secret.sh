@@ -17,8 +17,6 @@ terraform_root="$repo_root/targets/k3s/terraform"
 
 # shellcheck disable=SC1090
 source "$operator_config"
-kubeconfig_path="${HALLIGALLI_K3S_STATE_DIR:-$repo_root/.local/k3s}/admin.kubeconfig"
-[[ -f "$kubeconfig_path" ]] || die "Run k3s-operator.sh sync-kubeconfig first."
 
 set -a
 # shellcheck disable=SC1090
@@ -31,13 +29,9 @@ set +a
 : "${HALLIGALLI_K3S_CONTEXT:?Set HALLIGALLI_K3S_CONTEXT in targets/k3s/operator.env.}"
 context="$HALLIGALLI_K3S_CONTEXT"
 
-command -v terraform >/dev/null 2>&1 || die "Required command not found: terraform"
-command -v kubectl >/dev/null 2>&1 || die "Required command not found: kubectl"
-
 tunnel_token="$(terraform -chdir="$terraform_root" output -raw tunnel_token)"
 [[ -n "$tunnel_token" ]] || die "Terraform did not return a Tunnel token."
 
-export KUBECONFIG="$kubeconfig_path"
 kubectl --context "$context" \
   -n halligalli-edge create secret generic halligalli-tunnel \
   --from-literal="token=$tunnel_token" \
