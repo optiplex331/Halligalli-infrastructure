@@ -195,7 +195,8 @@ self-heal would undo them.
 
 After a deployment, promotion, or rollback, save the following to ignored
 local state (for example `.local/k3s/evidence/`) and hand it back so it can be
-committed later as sanitized K3s evidence:
+committed as a dated, sanitized summary under
+`targets/k3s/evidence/validation-YYYY-MM-DD.json`:
 
 - the UTC date and the operation (first deployment, promotion, or rollback);
 - the Infrastructure commit on `main` (`git rev-parse origin/main`) and the
