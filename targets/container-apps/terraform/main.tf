@@ -1,7 +1,10 @@
 locals {
+  # Match the live resources: the resource group predates the northeurope
+  # environment, and changing either value forces replacement.
+  resource_group_location        = "westeurope"
   location                       = "northeurope"
   resource_group_name            = "halligalli-container-apps"
-  container_app_environment_name = "halligalli-live-demo-env"
+  container_app_environment_name = "halligalli-live-demo"
   container_app_name             = "halligalli-live-demo"
 
   desired_state = jsondecode(file("${path.root}/desired-state.json"))
@@ -31,7 +34,7 @@ locals {
 
 resource "azurerm_resource_group" "live_demo" {
   name     = local.resource_group_name
-  location = local.location
+  location = local.resource_group_location
 }
 
 resource "azurerm_container_app_environment" "live_demo" {
