@@ -47,7 +47,7 @@ the checked-in Deployment Desired State.
 
 ## Promotion and deployment
 
-Run `Target Promotion - Container Apps` manually with a formal Release Tag. It downloads `paired-release-manifest.json`, verifies the tag/commit/Web/API binding and GitHub provenance for each digest, and creates or updates a Draft PR changing only `targets/container-apps/desired-state.json`. Development Images are rejected by construction.
+Run `Target Promotion - Container Apps` manually with a formal Release Tag. It downloads `paired-release-manifest.json`, verifies the tag/commit/Web/API binding and GitHub provenance for each digest, and creates or updates a Draft PR changing only `targets/container-apps/terraform/desired-state.json`. Development Images are rejected by construction.
 
 Promotion establishes release trust once. Reviewers decide whether to deploy
 the selected Release Tag to the Container Apps target, confirm the target-only
@@ -83,14 +83,14 @@ This repository does not store `AZURE_CREDENTIALS`, a user refresh token, a serv
 
 ## Rollback
 
-Rollback restores the previously reviewed runtime state in source control. Revert the promotion commit that changed `targets/container-apps/desired-state.json`, review and merge that revert, then create and review a new Terraform plan from the resulting `main`. Apply that saved plan and run the same immediate public smoke command above. Web and API digests must be restored together; editing or rolling back only one product image is invalid.
+Rollback restores the previously reviewed runtime state in source control. Revert the promotion commit that changed `targets/container-apps/terraform/desired-state.json`, review and merge that revert, then create and review a new Terraform plan from the resulting `main`. Apply that saved plan and run the same immediate public smoke command above. Web and API digests must be restored together; editing or rolling back only one product image is invalid.
 
 Single revision delivery does not retain manual traffic weights or provide an immediate traffic-flip rollback. If a new revision fails platform readiness, Azure leaves traffic on the previous ready revision. If a revision passes readiness but fails the public smoke, restore the previous complete pair through Git review and another approved Terraform apply.
 
 ## Monitoring and readiness
 
 `Monitor Live Demo` runs a read-only public HTTPS and WebSocket uptime check every
-three days and may also be dispatched manually. The workflow owns its exact
+hour and may also be dispatched manually. The workflow owns its exact
 schedule. Either check failing
 fails the workflow directly; the repository does not create or maintain a
 GitHub Issue incident for uptime failures.
