@@ -47,7 +47,7 @@ the checked-in Deployment Desired State.
 
 ## Promotion and deployment
 
-Run `Target Promotion - Container Apps` manually with a formal Release Tag. It downloads `paired-release-manifest.json`, verifies the tag/commit/Web/API binding and GitHub provenance for each digest, and creates or updates a Draft PR changing only `targets/container-apps/terraform/desired-state.json`. Development Images are rejected by construction.
+Run `Target Promotion` manually with target `container-apps` and a formal Release Tag. It downloads `paired-release-manifest.json`, verifies the tag/commit/Web/API binding plus the build provenance and CycloneDX SBOM attestations that the Product repository's `build-images.yml` signed for each digest, and creates or updates a Draft PR changing only `targets/container-apps/terraform/desired-state.json`. Only formal paired Release Images are eligible. Mark the Draft PR Ready for review to run the required `Static validation` check.
 
 Promotion establishes release trust once. Reviewers decide whether to deploy
 the selected Release Tag to the Container Apps target, confirm the target-only
@@ -89,24 +89,27 @@ Single revision delivery does not retain manual traffic weights or provide an im
 
 ## Monitoring and readiness
 
-`Monitor Live Demo` runs a read-only public HTTPS and WebSocket uptime check every
-hour and may also be dispatched manually. The workflow owns its exact
-schedule. The same run reads the public Web `/internal/identity`, downloads the
-public Paired Release Manifest for that version, and requires the manifest's
-runtime identity to match and its Web/API digests to equal
+`Monitor Live Demo` is a report-only reconciliation signal. It runs on a
+best-effort GitHub schedule (runs were observed 3-5 hours apart) and may also
+be dispatched manually. Each run reads the public Web `/internal/identity`,
+downloads the public Paired Release Manifest for that version, and compares the
+manifest's runtime identity and Web/API digests with
 `targets/container-apps/terraform/desired-state.json` on `main`. Only the Web
 identity is public, so the API side is matched through the paired manifest
-rather than a direct API request. A merged promotion that has not yet been
-applied therefore fails the monitor until the approved apply runs. Any check
-failing fails the workflow directly; the repository does not create or maintain a
-GitHub Issue incident for uptime failures.
+rather than a direct API request. Results go to the run's job summary and never
+fail the workflow: a merged promotion that has not yet been applied is expected
+drift until the approved apply runs. The run also reports public HTTPS and
+WebSocket reachability, report-only, until an external uptime probe owns uptime
+alerting; that probe is not yet registered. The repository does not create or
+maintain a GitHub Issue incident for monitor results.
 
-The scheduled check is a basic public availability signal, not a deployment gate.
+The scheduled report is not a deployment gate.
 Terraform declares HTTP startup and readiness probes for Web, an API startup
 probe plus `/internal/ready` readiness (which checks Redis), and TCP startup and
 readiness probes for Redis. Platform readiness determines whether a revision
 may receive traffic. The operator then runs the same read-only public smoke
-immediately after an approved deployment apply; this establishes external
-HTTPS and WebSocket behavior without waiting for the next scheduled uptime run.
+immediately after an approved deployment apply. Without `--report-only` the same
+script is a strict smoke that fails on any HTTPS, WebSocket, identity, or drift
+error.
 
 No command in this runbook authorizes Azure, DNS, or GitHub Environment mutation. Bootstrap and live recovery require separate explicit approval.

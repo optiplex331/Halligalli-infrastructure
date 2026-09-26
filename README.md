@@ -17,7 +17,7 @@ This repository owns Terraform, target-specific Deployment Desired State, indepe
 | `aks` | Maintained deployment-capable target | Target-scoped promotion and Argo CD GitOps reconciliation during approved validation runs |
 | `k3s` | Single-node target on the shared Linux host | Local SSH API access and target-owned desired state |
 
-Development Images are diagnostic only and cannot enter any formal promotion lane. One promotion changes exactly one target's desired-state file.
+Only formal Release Tags with paired Release Images can be promoted. One promotion changes exactly one target's desired-state file.
 
 Target-owned implementation lives under `targets/<target>/`. Container Apps
 owns its Deployment Desired State and Terraform root there. AKS owns its
@@ -48,7 +48,9 @@ flowchart LR
 ## Delivery controls
 
 - `main` accepts changes through pull requests, requires the static validation check, requires resolved review conversations, and rejects force-pushes and deletion.
-- Promotion workflows establish paired Web/API release trust once by verifying the release binding and GitHub artifact provenance before opening target-scoped Draft PRs. Reviewers decide deployment intent, target scope, and operational blockers; later deployment checks do not repeat release provenance. The workflows cannot merge those PRs. This repository does not let GitHub Actions create pull requests, so a run pushes `automation/<target>-promotion` and then fails at PR creation; the operator opens the PR from that branch.
+- The single `Target Promotion` workflow (`.github/workflows/promote.yml`) takes a `target` choice and a Release Tag, and runs one lane per target at a time. It establishes paired Web/API release trust once by verifying the release binding plus, for each digest, the SLSA build provenance and the CycloneDX SBOM attestation signed by the Product repository's `.github/workflows/build-images.yml` for that tag and commit. It then pushes `automation/<target>-promotion` and opens a target-scoped Draft PR as GitHub Actions. Reviewers decide deployment intent, target scope, and operational blockers; later deployment checks do not repeat release provenance. The workflow cannot merge those PRs.
+- PRs created with `GITHUB_TOKEN` trigger no workflows, so a human marks the Draft PR Ready for review; that `ready_for_review` event runs the required `Static validation` check.
+- Releases up to and including `v0.9.1` were signed by the retired `container.yml` workflow and cannot be newly promoted. Rollback is unchanged: reverting a promotion commit through a reviewed PR restores any previously approved pair without running promotion.
 - Container Apps deployment is deliberately not executed by GitHub Actions. Terraform consumes the checked-in target desired state directly; the operator reviews a saved local plan, explicitly approves its apply, and immediately runs the read-only public smoke described in the [Container Apps runbook](docs/operations/container-apps.md).
 - No Azure credential, user refresh token, service-principal secret, or publish profile is stored in GitHub.
 - Actions are restricted to GitHub-owned and verified publishers plus explicitly allowlisted repositories. Every referenced action is pinned to a full commit SHA.

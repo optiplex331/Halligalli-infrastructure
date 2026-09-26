@@ -6,7 +6,13 @@ import urllib.error
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from external_monitor import MANIFEST_URL, ReleaseIdentityError, check_release_identity  # noqa: E402
+from external_monitor import (  # noqa: E402
+    MANIFEST_URL,
+    ReleaseIdentityError,
+    check_release_identity,
+    render_report,
+    run_report,
+)
 
 ORIGIN = "https://play.example"
 COMMIT = "a" * 40
@@ -75,6 +81,27 @@ class ReleaseIdentityMonitorTest(unittest.TestCase):
         for name, responses, pattern in cases:
             with self.subTest(case=name), self.assertRaisesRegex(ReleaseIdentityError, pattern):
                 self.check(responses, desired_state())
+
+
+class ReportOnlyModeTest(unittest.TestCase):
+    def test_runs_every_check_and_reports_failures_without_raising(self) -> None:
+        calls = []
+
+        def failing() -> None:
+            calls.append("https")
+            raise RuntimeError("HTTPS returned 503")
+
+        def drifting() -> None:
+            calls.append("identity")
+            raise ReleaseIdentityError("web digest differs")
+
+        results = run_report([("HTTPS", failing), ("WebSocket", lambda: calls.append("ws")), ("Identity", drifting)])
+
+        self.assertEqual(calls, ["https", "ws", "identity"])
+        self.assertEqual([name for name, error in results if error], ["HTTPS", "Identity"])
+        report = render_report(ORIGIN, results)
+        self.assertIn("| WebSocket | pass |", report)
+        self.assertIn("FAIL: ReleaseIdentityError: web digest differs", report)
 
 
 if __name__ == "__main__":

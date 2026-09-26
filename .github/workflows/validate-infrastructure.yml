@@ -3,6 +3,9 @@ name: Infrastructure Static Validation
 
 on:
   pull_request:
+    # ready_for_review lets the human Draft -> Ready click run this check on
+    # promotion PRs created by GITHUB_TOKEN, which trigger no workflows.
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
   push:

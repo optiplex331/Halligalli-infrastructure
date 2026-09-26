@@ -1,14 +1,18 @@
-name: Reusable Target Promotion Proposal
+name: Target Promotion
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       target:
-        description: Closed Deployment Target selection
+        description: Deployment Target whose desired state the promotion changes
         required: true
-        type: string
+        type: choice
+        options:
+          - container-apps
+          - aks
+          - k3s
       release_tag:
-        description: Formal Paired Release Tag to propose
+        description: Formal Paired Release Tag to validate and propose
         required: true
         type: string
 
@@ -16,6 +20,10 @@ permissions:
   contents: write
   pull-requests: write
   attestations: read
+
+concurrency:
+  group: promote-${{ inputs.target }}
+  cancel-in-progress: false
 
 jobs:
   promote:
@@ -51,7 +59,7 @@ jobs:
           --manifest paired-release-manifest.json
           --pr-body-output /tmp/promotion-pr.md
 
-      - name: Verify paired artifact provenance
+      - name: Verify paired artifact provenance and SBOM attestations
         if: steps.promotion.outputs.promotion_required == 'true'
         shell: bash
         env:
@@ -62,12 +70,15 @@ jobs:
         run: |
           set -euo pipefail
           for image in "${WEB_IMAGE}" "${API_IMAGE}"; do
-            gh attestation verify "oci://${image}" \
-              --repo "${PRODUCT_REPOSITORY}" \
-              --signer-workflow "${PRODUCT_REPOSITORY}/.github/workflows/container.yml" \
-              --source-ref "refs/tags/${RELEASE_TAG}" \
-              --source-digest "${COMMIT}" \
-              --deny-self-hosted-runners
+            for predicate_type in https://slsa.dev/provenance/v1 https://cyclonedx.org/bom; do
+              gh attestation verify "oci://${image}" \
+                --predicate-type "${predicate_type}" \
+                --repo "${PRODUCT_REPOSITORY}" \
+                --signer-workflow "${PRODUCT_REPOSITORY}/.github/workflows/build-images.yml" \
+                --source-ref "refs/tags/${RELEASE_TAG}" \
+                --source-digest "${COMMIT}" \
+                --deny-self-hosted-runners
+            done
           done
 
       - name: Create or update Draft target promotion PR

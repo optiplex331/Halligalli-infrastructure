@@ -170,11 +170,13 @@ targets/k3s/scripts/k3s-public-smoke.sh
 
 ## Promotion and rollback
 
-`Target Promotion - K3s` validates the Product repository's schema-V2 Paired
-Release Manifest and artifact provenance, then proposes a Draft PR changing
+`Target Promotion` with target `k3s` validates the Product repository's
+schema-V2 Paired Release Manifest plus the build provenance and CycloneDX SBOM
+attestations signed by its `build-images.yml`, then proposes a Draft PR changing
 only `targets/k3s/gitops/runtime/values/experiment.values.json`. It always
-updates the Web/API digest pair together. Development Images, mutable tags,
-and one-image selections are not eligible. After the PR is merged, Argo CD
+updates the Web/API digest pair together. Only formal paired Release Images
+are eligible; mutable tags and one-image selections are not. Mark the Draft PR
+Ready for review to run the required `Static validation` check. After the PR is merged, Argo CD
 reconciles it; run the three checks above.
 
 Rollback is a reviewed Git revert, never a live change. Revert the promotion
