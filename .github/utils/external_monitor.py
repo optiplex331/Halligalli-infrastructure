@@ -10,6 +10,7 @@ import http.client
 import json
 import os
 import ssl
+import time
 import urllib.request
 from pathlib import Path
 from typing import Any, Callable
@@ -128,6 +129,12 @@ def main() -> None:
         action="store_true",
         help="run every check, write results to $GITHUB_STEP_SUMMARY (or stdout), and exit 0; the default fails on the first error",
     )
+    parser.add_argument(
+        "--wait-seconds",
+        type=int,
+        default=0,
+        help="strict mode only: retry all checks until they pass or this many seconds elapse, for a revision still taking traffic",
+    )
     args = parser.parse_args()
     checks: list[tuple[str, Callable[[], None]]] = [
         ("HTTPS", lambda: check_https(args.origin)),
@@ -135,9 +142,16 @@ def main() -> None:
         ("Release identity and desired-state drift", lambda: check_release_identity(args.origin, args.desired_state)),
     ]
     if not args.report_only:
-        for _, check in checks:
-            check()
-        return
+        deadline = time.monotonic() + args.wait_seconds
+        while True:
+            try:
+                for _, check in checks:
+                    check()
+                return
+            except Exception:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(10)
     report = render_report(args.origin, run_report(checks))
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path:

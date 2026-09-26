@@ -12,7 +12,9 @@ origin="${1:-https://k3s.halligalli.games}"
 
 python3 "$repo_root/.github/utils/external_monitor.py" \
   --origin "$origin" \
-  --websocket-path /ws/v1/rooms/k3s-smoke
+  --websocket-path /ws/v1/rooms/k3s-smoke \
+  --desired-state "$repo_root/targets/k3s/gitops/runtime/values/experiment.values.json" \
+  --wait-seconds 300
 
 rest_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
   --request POST \
