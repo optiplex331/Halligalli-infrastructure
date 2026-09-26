@@ -74,10 +74,10 @@ terraform -chdir=targets/container-apps/terraform show container-apps.tfplan
 Only after the saved plan has been reviewed and explicitly approved, run the apply and the existing read-only public HTTPS/WebSocket and release identity smoke as one operation:
 
 ```bash
-terraform -chdir=targets/container-apps/terraform apply container-apps.tfplan && python3 .github/utils/external_monitor.py --origin https://play.halligalli.games
+terraform -chdir=targets/container-apps/terraform apply container-apps.tfplan && python3 .github/utils/external_monitor.py --origin https://play.halligalli.games --wait-seconds 300
 ```
 
-Do not consider the deployment complete if apply or smoke fails. Terraform is the only command in this procedure that mutates the Container App; the smoke is read-only. The Container App uses Single revision mode, so Azure keeps traffic on the prior ready revision until the complete new revision passes its platform probes.
+Do not consider the deployment complete if apply or smoke fails. Terraform is the only command in this procedure that mutates the Container App; the smoke is read-only. The Container App uses Single revision mode, so Azure keeps traffic on the prior ready revision until the complete new revision passes its platform probes. Terraform can return before the new revision takes traffic, so the smoke retries for up to five minutes before failing.
 
 This repository does not store `AZURE_CREDENTIALS`, a user refresh token, a service-principal secret, or a publish profile in GitHub. Interactive login keeps MFA and deployment authority with the operator. It is intentionally a manual control, not unattended CD. If the tenant later permits a workload identity, automation can be proposed separately without changing the promotion boundary.
 
