@@ -34,3 +34,4 @@ targets/aks/evidence/*
 !targets/aks/evidence/validation-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].json
 targets/k3s/evidence/*
 !targets/k3s/evidence/validation-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].json
+!targets/k3s/evidence/validation-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-v*.json

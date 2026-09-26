@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "runDate": "2026-09-26",
+  "operation": "promotion",
+  "fromRelease": "v0.9.1",
+  "release": {
+    "releaseTag": "v0.9.2",
+    "productCommit": "97aa64f5d63808ec034a19b0309f5985c6c36bba",
+    "webDigest": "sha256:4936ebc9eefbc6f15b7bf7185a344a508634cd91dbdd70d157da9241c662c0b8",
+    "apiDigest": "sha256:15a9b4c7393eb79680a6616006c95fef82b61d0770d57c396c791ce6ed44149d"
+  },
+  "infrastructureCommit": "d63e99178df217a9a260615ef30efd9765c47ef8",
+  "runtime": {
+    "kubernetes": "v1.32.6+k3s1",
+    "readyNodes": 1,
+    "webReplicas": 2,
+    "apiReplicas": 2
+  },
+  "checks": {
+    "preflight": "passed",
+    "argoApplicationsSyncedHealthy": "passed",
+    "runningPodDigests": "passed",
+    "internalRuntimeSmoke": "passed",
+    "publicSmoke": "passed"
+  },
+  "incidents": [
+    "k3s-public-smoke.sh compared the running release with the container-apps desired state; fixed in the same change by passing the k3s desired state."
+  ],
+  "retention": {
+    "rawEvidencePublished": false
+  }
+}
