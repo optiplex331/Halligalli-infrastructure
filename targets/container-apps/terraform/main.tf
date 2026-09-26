@@ -103,6 +103,11 @@ resource "azurerm_container_app" "live_demo" {
         name  = "HALLIGALLI_REDIS_URL"
         value = "redis://localhost:6379/0"
       }
+      # The platform ingress appends the client and the Web nginx appends the ingress.
+      env {
+        name  = "HALLIGALLI_TRUSTED_PROXY_HOPS"
+        value = "2"
+      }
 
       startup_probe {
         transport               = "TCP"
