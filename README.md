@@ -7,7 +7,7 @@ Production.
 
 ## Ownership
 
-This repository owns Terraform, target-specific Deployment Desired State, independent manual Target Promotion lanes, deployment workflows, AKS Helm and Argo CD, observability, runbooks, and sanitized validation evidence. The [Product repository](https://github.com/optiplex331/Halligalli-BossYang) owns source, tests, formal Release Tags, paired Release Images, GitHub artifact provenance, and `paired-release-manifest.json`.
+This repository owns Terraform, target-specific Deployment Desired State, independent manual Target Promotion lanes, deployment workflows, AKS and K3s Helm and Argo CD, observability, runbooks, and sanitized validation evidence. The [Product repository](https://github.com/optiplex331/Halligalli-BossYang) owns source, tests, formal Release Tags, paired Release Images, GitHub artifact provenance, and `paired-release-manifest.json`.
 
 ## Targets
 
