@@ -12,10 +12,10 @@ Deployment Desired State owns the runtime image selection, and the Terraform
 root consumes it directly. Release tag, commit, and provenance remain in the
 Promotion PR rather than being duplicated in this runtime file.
 
-The Terraform `local.location` value is the single region setting for this
-target. It sets both the Terraform-managed resource group and the Container
-Apps environment; the target does not expose a separate resource-group
-metadata region or supported Terraform input variables.
+Terraform locals own the target's regions: `local.location` places the
+Container Apps environment and app, and `local.resource_group_location` places
+the resource group metadata. The target exposes no supported Terraform input
+variables for either.
 
 Creating the DNS validation records, managed certificate, and `play.halligalli.games` binding is a separately approved bootstrap operation. AzureRM exposes the app's custom-domain collection as read-only, so this repository does not pretend that Terraform owns that binding or hide it behind deployment.
 
