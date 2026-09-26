@@ -63,8 +63,10 @@ templates render those values without repeating schema validation; Kubernetes
 owns platform resource-name validation.
 
 The Product repository owns source, formal Release Tags, Release Images,
-artifact provenance, and the Paired Release Manifest. `Target Promotion - AKS`
-validates that evidence and proposes a Draft PR changing only the AKS desired
+artifact provenance, and the Paired Release Manifest. `Target Promotion` with
+target `aks` validates that evidence, including the build provenance and
+CycloneDX SBOM attestations signed by the Product repository's
+`build-images.yml`, and proposes a Draft PR changing only the AKS desired
 state. It cannot merge the PR, reconcile Argo CD, or deploy Azure resources.
 Promotion establishes release trust once. Reviewers decide whether that Release
 Tag should be deployed to AKS, confirm the target-scoped diff, and consider
