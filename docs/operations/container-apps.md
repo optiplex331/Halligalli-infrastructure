@@ -19,6 +19,19 @@ variables for either.
 
 Creating the DNS validation records, managed certificate, and `play.halligalli.games` binding is a separately approved bootstrap operation. AzureRM exposes the app's custom-domain collection as read-only, so this repository does not pretend that Terraform owns that binding or hide it behind deployment.
 
+## Cloudflare edge and client addresses
+
+`play.halligalli.games` is proxied by Cloudflare. Terraform restricts the app
+ingress to Cloudflare's published IPv4 ranges (`local.cloudflare_ipv4_ranges`,
+from <https://www.cloudflare.com/ips/>), so the default
+`*.azurecontainerapps.io` FQDN is not a way around the edge; use the public host
+for every smoke and monitor. With the edge enforced, three proxies append to
+`X-Forwarded-For` before the API: Cloudflare (the client), the platform ingress
+(the Cloudflare edge), and the Web nginx (the ingress). The API therefore runs
+with `HALLIGALLI_TRUSTED_PROXY_HOPS=3` and keys the room-creation budget on the
+real client. When Cloudflare changes its ranges, update the local in a reviewed
+change and apply it through the normal procedure.
+
 ## Bootstrap order
 
 Bootstrap uses Azure AD authentication and remote Terraform state. Create the
