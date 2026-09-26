@@ -99,8 +99,9 @@ identity is public, so the API side is matched through the paired manifest
 rather than a direct API request. Results go to the run's job summary and never
 fail the workflow: a merged promotion that has not yet been applied is expected
 drift until the approved apply runs. The run also reports public HTTPS and
-WebSocket reachability, report-only, until an external uptime probe owns uptime
-alerting; that probe is not yet registered. The repository does not create or
+WebSocket reachability as report-only context. Public uptime alerting belongs
+to UptimeRobot, which the operator configures outside this repository; its
+account and alert contacts are not recorded here. The repository does not create or
 maintain a GitHub Issue incident for monitor results.
 
 The scheduled report is not a deployment gate.
