@@ -96,15 +96,54 @@ def check_release_identity(
     verify_release_identity(identity, manifest, desired_state)
 
 
+def run_report(checks: list[tuple[str, Callable[[], None]]]) -> list[tuple[str, str | None]]:
+    """Run every check without stopping at the first failure; return (name, error or None)."""
+    results: list[tuple[str, str | None]] = []
+    for name, check in checks:
+        try:
+            check()
+        except Exception as error:  # noqa: BLE001 - report-only mode records every failure
+            results.append((name, f"{type(error).__name__}: {error}"))
+        else:
+            results.append((name, None))
+    return results
+
+
+def render_report(origin: str, results: list[tuple[str, str | None]]) -> str:
+    lines = [f"## Live Demo report for {origin}", "", "| Check | Result |", "|---|---|"]
+    for name, error in results:
+        result = "pass" if error is None else f"FAIL: {error}".replace("|", "\\|")
+        lines.append(f"| {name} | {result} |")
+    lines += ["", "Report-only: failures do not fail this run. Drift is expected between a merged promotion and its approved apply."]
+    return "\n".join(lines) + "\n"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--origin", default="https://play.halligalli.games")
     parser.add_argument("--websocket-path", default="/ws/v1/rooms/monitor")
     parser.add_argument("--desired-state", type=Path, default=DESIRED_STATE_PATH)
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        help="run every check, write results to $GITHUB_STEP_SUMMARY (or stdout), and exit 0; the default fails on the first error",
+    )
     args = parser.parse_args()
-    check_https(args.origin)
-    check_websocket(args.origin, args.websocket_path)
-    check_release_identity(args.origin, args.desired_state)
+    checks: list[tuple[str, Callable[[], None]]] = [
+        ("HTTPS", lambda: check_https(args.origin)),
+        ("WebSocket", lambda: check_websocket(args.origin, args.websocket_path)),
+        ("Release identity and desired-state drift", lambda: check_release_identity(args.origin, args.desired_state)),
+    ]
+    if not args.report_only:
+        for _, check in checks:
+            check()
+        return
+    report = render_report(args.origin, run_report(checks))
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        with open(summary_path, "a", encoding="utf-8") as summary:
+            summary.write(report)
+    print(report, end="")
 
 
 if __name__ == "__main__":
