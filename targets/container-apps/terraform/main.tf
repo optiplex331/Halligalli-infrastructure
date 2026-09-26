@@ -128,7 +128,7 @@ resource "azurerm_container_app" "live_demo" {
       image   = local.redis_image
       cpu     = 0.12
       memory  = "0.25Gi"
-      command = ["sh", "-c", "exec redis-server --save '' --appendonly no"]
+      command = ["sh", "-c", "exec redis-server --save '' --appendonly no --maxmemory 180mb --maxmemory-policy noeviction"]
 
       startup_probe {
         transport               = "TCP"

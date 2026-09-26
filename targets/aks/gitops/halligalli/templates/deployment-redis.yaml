@@ -32,7 +32,7 @@ spec:
         - name: redis
           image: "{{ .Values.redisImage.repository }}@{{ .Values.redisImage.digest }}"
           command: ["/bin/sh", "-c"]
-          args: ["exec redis-server --save '' --appendonly no --aclfile /etc/redis/users.acl"]
+          args: ["exec redis-server --save '' --appendonly no --maxmemory 180mb --maxmemory-policy noeviction --aclfile /etc/redis/users.acl"]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
