@@ -2,11 +2,11 @@
   "deploymentEnabled": true,
   "webImage": {
     "repository": "ghcr.io/optiplex331/halligalli-bossyang-web",
-    "digest": "sha256:4936ebc9eefbc6f15b7bf7185a344a508634cd91dbdd70d157da9241c662c0b8"
+    "digest": "sha256:0536f2cff4b8176e1c3546ae6cf9c3fd0171162edd688ceebbf672fc1430f774"
   },
   "apiImage": {
     "repository": "ghcr.io/optiplex331/halligalli-bossyang-api",
-    "digest": "sha256:15a9b4c7393eb79680a6616006c95fef82b61d0770d57c396c791ce6ed44149d"
+    "digest": "sha256:4866bb53cb00ae564f13acbcbb9272580a6eeebb88492a67655c443edefe894a"
   },
   "redisImage": {
     "repository": "docker.io/library/redis",
