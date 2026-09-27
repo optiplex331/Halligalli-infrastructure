@@ -43,6 +43,9 @@ spec:
           env:
             - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
               value: "http://halligalli-observability-collector.halligalli-observability.svc.cluster.local:4318/v1/traces"
+            # Cloudflare appends the client, cloudflared forwards unchanged, and the Web nginx appends cloudflared.
+            - name: HALLIGALLI_TRUSTED_PROXY_HOPS
+              value: "2"
           command: ["/bin/sh", "-c"]
           args:
             - >-

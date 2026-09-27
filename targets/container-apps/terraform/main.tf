@@ -7,6 +7,29 @@ locals {
   container_app_environment_name = "halligalli-live-demo"
   container_app_name             = "halligalli-live-demo"
 
+  # Cloudflare proxies play.halligalli.games, so the ingress admits only Cloudflare's edge.
+  # Otherwise the default *.azurecontainerapps.io FQDN would bypass Cloudflare and let a client
+  # write the X-Forwarded-For entry the API trusts as the client address.
+  # Source: https://www.cloudflare.com/ips/ (ips-v4), fetched 2026-09-26. The Container Apps
+  # ingress is IPv4-only, so Cloudflare reaches it over IPv4 and the IPv6 ranges are omitted.
+  cloudflare_ipv4_ranges = [
+    "173.245.48.0/20",
+    "103.21.244.0/22",
+    "103.22.200.0/22",
+    "103.31.4.0/22",
+    "141.101.64.0/18",
+    "108.162.192.0/18",
+    "190.93.240.0/20",
+    "188.114.96.0/20",
+    "197.234.240.0/22",
+    "198.41.128.0/17",
+    "162.158.0.0/15",
+    "104.16.0.0/13",
+    "104.24.0.0/14",
+    "172.64.0.0/13",
+    "131.0.72.0/22",
+  ]
+
   desired_state = jsondecode(file("${path.root}/desired-state.json"))
 
   web_repository   = try(local.desired_state.webImage.repository, "")
@@ -58,6 +81,16 @@ resource "azurerm_container_app" "live_demo" {
       latest_revision = true
       percentage      = 100
     }
+
+    dynamic "ip_security_restriction" {
+      for_each = local.cloudflare_ipv4_ranges
+      content {
+        name             = "cloudflare-${ip_security_restriction.key}"
+        description      = "Cloudflare edge"
+        action           = "Allow"
+        ip_address_range = ip_security_restriction.value
+      }
+    }
   }
 
   template {
@@ -102,6 +135,12 @@ resource "azurerm_container_app" "live_demo" {
       env {
         name  = "HALLIGALLI_REDIS_URL"
         value = "redis://localhost:6379/0"
+      }
+      # Cloudflare appends the client, the platform ingress appends the Cloudflare edge, and the
+      # Web nginx appends the ingress. The ingress admits only Cloudflare, so all three are trusted.
+      env {
+        name  = "HALLIGALLI_TRUSTED_PROXY_HOPS"
+        value = "3"
       }
 
       startup_probe {
