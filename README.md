@@ -88,6 +88,7 @@ These commands are static validation only. Never use a cloud apply as validation
 
 The operational runbooks are [Container Apps Live Demo](docs/operations/container-apps.md),
 [AKS Deployment Target](docs/operations/aks.md), and [K3s Deployment Target](docs/operations/k3s.md).
+The Live Demo's measured service targets are in [Container Apps service targets](docs/operations/container-apps-slo.md).
 Executable desired state owns current release, platform, resource, and dependency selections. Future completed
 AKS run facts live only in dated files under `targets/aks/evidence/`; the existing
 `targets/aks/evidence/validation-summary.json` is an immutable historical exception.

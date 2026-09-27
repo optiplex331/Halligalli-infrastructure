@@ -119,6 +119,9 @@ to UptimeRobot, which the operator configures outside this repository; its
 account and alert contacts are not recorded here. The repository does not create or
 maintain a GitHub Issue incident for monitor results.
 
+Measured service targets and the room-loss limitation are in
+[Container Apps service targets](container-apps-slo.md).
+
 The scheduled report is not a deployment gate.
 Terraform declares HTTP startup and readiness probes for Web, an API startup
 probe plus `/internal/ready` readiness (which checks Redis), and TCP startup and
