@@ -79,6 +79,8 @@ terraform -chdir=targets/container-apps/terraform apply container-apps.tfplan &&
 
 Do not consider the deployment complete if apply or smoke fails. Terraform is the only command in this procedure that mutates the Container App; the smoke is read-only. The Container App uses Single revision mode, so Azure keeps traffic on the prior ready revision until the complete new revision passes its platform probes. Terraform can return before the new revision takes traffic, so the smoke retries for up to five minutes before failing.
 
+Every deployment, including a rollback, loses all active rooms because Redis runs inside the replica and is replaced with it. The Web's reconnect after a planned API restart (close code 1012) preserves rooms only on the `k3s` and `aks` targets, where Redis is separate from the API replica.
+
 This repository does not store `AZURE_CREDENTIALS`, a user refresh token, a service-principal secret, or a publish profile in GitHub. Interactive login keeps MFA and deployment authority with the operator. It is intentionally a manual control, not unattended CD. If the tenant later permits a workload identity, automation can be proposed separately without changing the promotion boundary.
 
 ## Rollback
