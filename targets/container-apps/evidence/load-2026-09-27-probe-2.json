@@ -1,0 +1,784 @@
+{
+  "schemaVersion": 1,
+  "target": "approved-live-demo",
+  "startedAt": "2026-09-27T13:19:21.802Z",
+  "finishedAt": "2026-09-27T13:28:33.908Z",
+  "totalDurationSeconds": 552.11,
+  "runLimitSeconds": 1200,
+  "configuration": {
+    "stepSeconds": 150,
+    "steps": 7,
+    "capacityProbe": true,
+    "rampRooms": [
+      8,
+      11,
+      14,
+      16,
+      18,
+      20,
+      22
+    ],
+    "mixedHumanParticipantsPerRoom": {
+      "min": 2,
+      "max": 6
+    },
+    "mixedTableSeats": {
+      "min": 4,
+      "max": 8
+    },
+    "difficultyWeights": {
+      "easy": 0.3,
+      "normal": 0.5,
+      "hard": 0.2
+    },
+    "reactionMedianMs": 450,
+    "reactionSigma": 0.35,
+    "missedWindowProbability": 0.15,
+    "wrongBellProbability": 0.05,
+    "reconnectProbabilityPerMatch": 0.05,
+    "rematchProbabilityAfterFirstMatch": 0.5
+  },
+  "release": {
+    "tag": "v0.10.0",
+    "webDigest": "sha256:0536f2cff4b8176e1c3546ae6cf9c3fd0171162edd688ceebbf672fc1430f774",
+    "apiDigest": "sha256:4866bb53cb00ae564f13acbcbb9272580a6eeebb88492a67655c443edefe894a"
+  },
+  "totals": {
+    "roomsStarted": 68,
+    "matchesCompleted": 77,
+    "humanParticipantsInCompletedMatches": 292,
+    "clientOperations": 3816,
+    "clientErrors": 0,
+    "clientErrorRate": 0,
+    "observedBellWindows": 1149,
+    "correctHits": 967,
+    "wrongHits": 251,
+    "missedHits": null,
+    "missedBellOutcomes": 181,
+    "staleFrames": 1329,
+    "racingBellAttempts": 2298,
+    "plannedMissedWindows": 182,
+    "accidentalWrongBellAttempts": 251,
+    "reconnects": 6,
+    "intendedReactionP50Ms": 442
+  },
+  "steps": [
+    {
+      "id": "ramp-8-rooms",
+      "targetConcurrentRooms": 8,
+      "peakConcurrentRooms": 8,
+      "roomsStarted": 16,
+      "designLoad": null,
+      "matchesStarted": 20,
+      "matchesCompleted": 13,
+      "roomShapes": {
+        "humansPerRoom": {
+          "2": 4,
+          "3": 3,
+          "4": 7,
+          "5": 1,
+          "6": 1
+        },
+        "tableSeats": {
+          "4": 3,
+          "5": 6,
+          "6": 0,
+          "7": 3,
+          "8": 4
+        },
+        "difficulty": {
+          "easy": 5,
+          "normal": 9,
+          "hard": 2
+        },
+        "invalidShapes": 0
+      },
+      "clientCadence": {
+        "p50LatenessMs": 0,
+        "p95LatenessMs": 89.5,
+        "p99LatenessMs": 103.4,
+        "p95RevealGapMs": 1809.9
+      },
+      "serverTickLatenessP95Ms": 106,
+      "serverCommandLatencyP95Ms": null,
+      "serverDueProcessingP95Ms": null,
+      "serverTickSamples": null,
+      "maxRedisMemoryRatio": 0.014,
+      "medianApiCpuCores": 0.071,
+      "bellOutcomes": {
+        "correct": 167,
+        "wrong": 46,
+        "stale": 0,
+        "missed": 32
+      },
+      "clientObservedBellWindows": 200,
+      "racingBellAttempts": 400,
+      "plannedMissedWindows": 33,
+      "accidentalWrongBellAttempts": 46,
+      "reconnects": 0,
+      "clientErrorRate": 0,
+      "clientOperations": 696,
+      "clientErrors": 0,
+      "invariantMatchesObserved": 13
+    },
+    {
+      "id": "ramp-11-rooms",
+      "targetConcurrentRooms": 11,
+      "peakConcurrentRooms": 11,
+      "roomsStarted": 14,
+      "designLoad": null,
+      "matchesStarted": 19,
+      "matchesCompleted": 18,
+      "roomShapes": {
+        "humansPerRoom": {
+          "2": 3,
+          "3": 5,
+          "4": 2,
+          "5": 3,
+          "6": 1
+        },
+        "tableSeats": {
+          "4": 4,
+          "5": 3,
+          "6": 3,
+          "7": 3,
+          "8": 1
+        },
+        "difficulty": {
+          "easy": 5,
+          "normal": 9,
+          "hard": 0
+        },
+        "invalidShapes": 0
+      },
+      "clientCadence": {
+        "p50LatenessMs": 0,
+        "p95LatenessMs": 88.8,
+        "p99LatenessMs": 102.1,
+        "p95RevealGapMs": 1829
+      },
+      "serverTickLatenessP95Ms": 105,
+      "serverCommandLatencyP95Ms": null,
+      "serverDueProcessingP95Ms": null,
+      "serverTickSamples": null,
+      "maxRedisMemoryRatio": 0.0145,
+      "medianApiCpuCores": 0.09,
+      "bellOutcomes": {
+        "correct": 246,
+        "wrong": 58,
+        "stale": 0,
+        "missed": 39
+      },
+      "clientObservedBellWindows": 284,
+      "racingBellAttempts": 568,
+      "plannedMissedWindows": 38,
+      "accidentalWrongBellAttempts": 58,
+      "reconnects": 0,
+      "clientErrorRate": 0,
+      "clientOperations": 883,
+      "clientErrors": 0,
+      "invariantMatchesObserved": 18
+    },
+    {
+      "id": "ramp-14-rooms",
+      "targetConcurrentRooms": 14,
+      "peakConcurrentRooms": 14,
+      "roomsStarted": 24,
+      "designLoad": null,
+      "matchesStarted": 32,
+      "matchesCompleted": 28,
+      "roomShapes": {
+        "humansPerRoom": {
+          "2": 6,
+          "3": 5,
+          "4": 4,
+          "5": 3,
+          "6": 6
+        },
+        "tableSeats": {
+          "4": 3,
+          "5": 8,
+          "6": 4,
+          "7": 5,
+          "8": 4
+        },
+        "difficulty": {
+          "easy": 5,
+          "normal": 12,
+          "hard": 7
+        },
+        "invalidShapes": 0
+      },
+      "clientCadence": {
+        "p50LatenessMs": 0,
+        "p95LatenessMs": 97.9,
+        "p99LatenessMs": 155,
+        "p95RevealGapMs": 1601
+      },
+      "serverTickLatenessP95Ms": 157,
+      "serverCommandLatencyP95Ms": null,
+      "serverDueProcessingP95Ms": null,
+      "serverTickSamples": null,
+      "maxRedisMemoryRatio": 0.0155,
+      "medianApiCpuCores": 0.127,
+      "bellOutcomes": {
+        "correct": 317,
+        "wrong": 90,
+        "stale": 0,
+        "missed": 63
+      },
+      "clientObservedBellWindows": 381,
+      "racingBellAttempts": 762,
+      "plannedMissedWindows": 64,
+      "accidentalWrongBellAttempts": 90,
+      "reconnects": 0,
+      "clientErrorRate": 0,
+      "clientOperations": 1299,
+      "clientErrors": 0,
+      "invariantMatchesObserved": 28
+    },
+    {
+      "id": "ramp-16-rooms",
+      "targetConcurrentRooms": 16,
+      "peakConcurrentRooms": 16,
+      "roomsStarted": 14,
+      "designLoad": null,
+      "matchesStarted": 20,
+      "matchesCompleted": 18,
+      "roomShapes": {
+        "humansPerRoom": {
+          "2": 2,
+          "3": 2,
+          "4": 2,
+          "5": 2,
+          "6": 6
+        },
+        "tableSeats": {
+          "4": 1,
+          "5": 3,
+          "6": 6,
+          "7": 2,
+          "8": 2
+        },
+        "difficulty": {
+          "easy": 6,
+          "normal": 7,
+          "hard": 1
+        },
+        "invalidShapes": 0
+      },
+      "clientCadence": {
+        "p50LatenessMs": 0,
+        "p95LatenessMs": 109.5,
+        "p99LatenessMs": 219.7,
+        "p95RevealGapMs": 1824.7
+      },
+      "serverTickLatenessP95Ms": 288,
+      "serverCommandLatencyP95Ms": null,
+      "serverDueProcessingP95Ms": null,
+      "serverTickSamples": null,
+      "maxRedisMemoryRatio": 0.0161,
+      "medianApiCpuCores": 0.156,
+      "bellOutcomes": {
+        "correct": 237,
+        "wrong": 57,
+        "stale": 0,
+        "missed": 47
+      },
+      "clientObservedBellWindows": 284,
+      "racingBellAttempts": 568,
+      "plannedMissedWindows": 47,
+      "accidentalWrongBellAttempts": 57,
+      "reconnects": 0,
+      "clientErrorRate": 0,
+      "clientOperations": 938,
+      "clientErrors": 0,
+      "invariantMatchesObserved": 18
+    }
+  ],
+  "invariants": [
+    {
+      "name": "at most one correct bell per Bell Window",
+      "status": "pass",
+      "observed": {
+        "correctHits": 967,
+        "source": "in-flight score snapshots",
+        "windowsOpened": 1149,
+        "finalMatches": 77
+      }
+    },
+    {
+      "name": "Stale Bells change no score",
+      "status": "pass",
+      "observed": {
+        "staleFrames": 1329
+      }
+    },
+    {
+      "name": "Score Breakdown sums to score",
+      "status": "pass",
+      "observed": {
+        "finalParticipantsChecked": 292
+      }
+    },
+    {
+      "name": "room revision monotonic per socket",
+      "status": "pass",
+      "observed": {
+        "socketLifecycles": 270
+      }
+    },
+    {
+      "name": "room sizes stay within 2-6 humans and 4-8 seats without overfilling",
+      "status": "pass",
+      "observed": {
+        "roomsCreated": 68,
+        "invalidRoomShapes": 0
+      }
+    },
+    {
+      "name": "Design Load uses ten four-human normal rooms",
+      "status": "not_run",
+      "observed": {
+        "step": "not reached"
+      }
+    }
+  ],
+  "invariantViolations": [],
+  "metrics": {
+    "endpointConfigured": false,
+    "endpointReachable": false,
+    "finalBellOutcomeCounters": null,
+    "bellOutcomeReconciliation": [],
+    "bellOutcomeCountersReconciled": null,
+    "matchSnapshotReconciliationComplete": false,
+    "runtimeSummarySamples": 37,
+    "latestRuntimeSummary": {
+      "at": "2026-09-27T13:28:33.891Z",
+      "tickLatenessP95Ms": 288,
+      "redisUsedMemoryBytes": 3030360,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 240,
+      "activeSockets": 71,
+      "watchRetries": 59,
+      "tickSamples": 234,
+      "apiCpuCores": 0.179
+    }
+  },
+  "abortReason": "server p95 tick lateness exceeded 250 ms",
+  "capacityKnee": "ramp-14-rooms",
+  "designLoadVerdict": "not_applicable",
+  "designLoadApiCpuRatio": null,
+  "fanOutWorkTriggered": null,
+  "latencySignalsDisagree": false,
+  "clientErrorReasons": {},
+  "runtimeSummary": [
+    {
+      "at": "2026-09-27T13:19:33.812Z",
+      "tickLatenessP95Ms": 101,
+      "redisUsedMemoryBytes": 2548840,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 180,
+      "activeSockets": 29,
+      "watchRetries": 44,
+      "tickSamples": 92,
+      "apiCpuCores": 0.074
+    },
+    {
+      "at": "2026-09-27T13:19:48.814Z",
+      "tickLatenessP95Ms": 99,
+      "redisUsedMemoryBytes": 2559576,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 180,
+      "activeSockets": 29,
+      "watchRetries": 0,
+      "tickSamples": 125,
+      "apiCpuCores": 0.069
+    },
+    {
+      "at": "2026-09-27T13:20:03.844Z",
+      "tickLatenessP95Ms": 106,
+      "redisUsedMemoryBytes": 2557552,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 180,
+      "activeSockets": 29,
+      "watchRetries": 0,
+      "tickSamples": 128,
+      "apiCpuCores": 0.072
+    },
+    {
+      "at": "2026-09-27T13:20:18.878Z",
+      "tickLatenessP95Ms": 101,
+      "redisUsedMemoryBytes": 2580680,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 181,
+      "activeSockets": 30,
+      "watchRetries": 7,
+      "tickSamples": 127,
+      "apiCpuCores": 0.074
+    },
+    {
+      "at": "2026-09-27T13:20:33.810Z",
+      "tickLatenessP95Ms": 95,
+      "redisUsedMemoryBytes": 2583168,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 183,
+      "activeSockets": 29,
+      "watchRetries": 22,
+      "tickSamples": 106,
+      "apiCpuCores": 0.078
+    },
+    {
+      "at": "2026-09-27T13:20:48.855Z",
+      "tickLatenessP95Ms": 76,
+      "redisUsedMemoryBytes": 2598584,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 185,
+      "activeSockets": 30,
+      "watchRetries": 15,
+      "tickSamples": 86,
+      "apiCpuCores": 0.053
+    },
+    {
+      "at": "2026-09-27T13:21:03.816Z",
+      "tickLatenessP95Ms": 101,
+      "redisUsedMemoryBytes": 2616480,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 185,
+      "activeSockets": 30,
+      "watchRetries": 9,
+      "tickSamples": 94,
+      "apiCpuCores": 0.063
+    },
+    {
+      "at": "2026-09-27T13:21:18.815Z",
+      "tickLatenessP95Ms": 101,
+      "redisUsedMemoryBytes": 2595912,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 185,
+      "activeSockets": 30,
+      "watchRetries": 1,
+      "tickSamples": 115,
+      "apiCpuCores": 0.074
+    },
+    {
+      "at": "2026-09-27T13:21:33.856Z",
+      "tickLatenessP95Ms": 98,
+      "redisUsedMemoryBytes": 2644112,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 185,
+      "activeSockets": 30,
+      "watchRetries": 8,
+      "tickSamples": 109,
+      "apiCpuCores": 0.071
+    },
+    {
+      "at": "2026-09-27T13:21:48.910Z",
+      "tickLatenessP95Ms": 91,
+      "redisUsedMemoryBytes": 2630600,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 187,
+      "activeSockets": 27,
+      "watchRetries": 5,
+      "tickSamples": 95,
+      "apiCpuCores": 0.06
+    },
+    {
+      "at": "2026-09-27T13:22:03.814Z",
+      "tickLatenessP95Ms": 105,
+      "redisUsedMemoryBytes": 2673064,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 192,
+      "activeSockets": 42,
+      "watchRetries": 39,
+      "tickSamples": 143,
+      "apiCpuCores": 0.109
+    },
+    {
+      "at": "2026-09-27T13:22:22.053Z",
+      "tickLatenessP95Ms": 101,
+      "redisUsedMemoryBytes": 2666832,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 193,
+      "activeSockets": 42,
+      "watchRetries": 17,
+      "tickSamples": 177,
+      "apiCpuCores": 0.107
+    },
+    {
+      "at": "2026-09-27T13:22:33.815Z",
+      "tickLatenessP95Ms": 104,
+      "redisUsedMemoryBytes": 2674952,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 193,
+      "activeSockets": 42,
+      "watchRetries": 0,
+      "tickSamples": 174,
+      "apiCpuCores": 0.096
+    },
+    {
+      "at": "2026-09-27T13:22:48.831Z",
+      "tickLatenessP95Ms": 100,
+      "redisUsedMemoryBytes": 2667760,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 194,
+      "activeSockets": 42,
+      "watchRetries": 4,
+      "tickSamples": 169,
+      "apiCpuCores": 0.098
+    },
+    {
+      "at": "2026-09-27T13:23:03.816Z",
+      "tickLatenessP95Ms": 97,
+      "redisUsedMemoryBytes": 2717632,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 198,
+      "activeSockets": 38,
+      "watchRetries": 32,
+      "tickSamples": 145,
+      "apiCpuCores": 0.104
+    },
+    {
+      "at": "2026-09-27T13:23:18.833Z",
+      "tickLatenessP95Ms": 103,
+      "redisUsedMemoryBytes": 2709976,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 199,
+      "activeSockets": 39,
+      "watchRetries": 10,
+      "tickSamples": 125,
+      "apiCpuCores": 0.08
+    },
+    {
+      "at": "2026-09-27T13:23:34.041Z",
+      "tickLatenessP95Ms": 102,
+      "redisUsedMemoryBytes": 2693992,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 200,
+      "activeSockets": 36,
+      "watchRetries": 15,
+      "tickSamples": 130,
+      "apiCpuCores": 0.073
+    },
+    {
+      "at": "2026-09-27T13:23:48.856Z",
+      "tickLatenessP95Ms": 104,
+      "redisUsedMemoryBytes": 2714184,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 201,
+      "activeSockets": 37,
+      "watchRetries": 10,
+      "tickSamples": 148,
+      "apiCpuCores": 0.088
+    },
+    {
+      "at": "2026-09-27T13:24:03.818Z",
+      "tickLatenessP95Ms": 100,
+      "redisUsedMemoryBytes": 2735552,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 201,
+      "activeSockets": 37,
+      "watchRetries": 6,
+      "tickSamples": 172,
+      "apiCpuCores": 0.09
+    },
+    {
+      "at": "2026-09-27T13:24:20.358Z",
+      "tickLatenessP95Ms": 99,
+      "redisUsedMemoryBytes": 2741680,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 202,
+      "activeSockets": 37,
+      "watchRetries": 11,
+      "tickSamples": 138,
+      "apiCpuCores": 0.078
+    },
+    {
+      "at": "2026-09-27T13:24:45.106Z",
+      "tickLatenessP95Ms": 102,
+      "redisUsedMemoryBytes": 2800232,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 208,
+      "activeSockets": 51,
+      "watchRetries": 45,
+      "tickSamples": 162,
+      "apiCpuCores": 0.119
+    },
+    {
+      "at": "2026-09-27T13:24:58.481Z",
+      "tickLatenessP95Ms": 115,
+      "redisUsedMemoryBytes": 2803368,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 209,
+      "activeSockets": 53,
+      "watchRetries": 18,
+      "tickSamples": 201,
+      "apiCpuCores": 0.127
+    },
+    {
+      "at": "2026-09-27T13:25:06.180Z",
+      "tickLatenessP95Ms": 112,
+      "redisUsedMemoryBytes": 2797080,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 209,
+      "activeSockets": 53,
+      "watchRetries": 4,
+      "tickSamples": 211,
+      "apiCpuCores": 0.125
+    },
+    {
+      "at": "2026-09-27T13:25:36.557Z",
+      "tickLatenessP95Ms": 122,
+      "redisUsedMemoryBytes": 2833024,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 213,
+      "activeSockets": 54,
+      "watchRetries": 35,
+      "tickSamples": 215,
+      "apiCpuCores": 0.14
+    },
+    {
+      "at": "2026-09-27T13:25:40.638Z",
+      "tickLatenessP95Ms": 115,
+      "redisUsedMemoryBytes": 2834168,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 215,
+      "activeSockets": 50,
+      "watchRetries": 13,
+      "tickSamples": 218,
+      "apiCpuCores": 0.129
+    },
+    {
+      "at": "2026-09-27T13:25:50.241Z",
+      "tickLatenessP95Ms": 112,
+      "redisUsedMemoryBytes": 2852944,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 218,
+      "activeSockets": 52,
+      "watchRetries": 37,
+      "tickSamples": 218,
+      "apiCpuCores": 0.136
+    },
+    {
+      "at": "2026-09-27T13:26:04.854Z",
+      "tickLatenessP95Ms": 110,
+      "redisUsedMemoryBytes": 2849016,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 219,
+      "activeSockets": 54,
+      "watchRetries": 8,
+      "tickSamples": 212,
+      "apiCpuCores": 0.116
+    },
+    {
+      "at": "2026-09-27T13:26:18.937Z",
+      "tickLatenessP95Ms": 157,
+      "redisUsedMemoryBytes": 2902920,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 223,
+      "activeSockets": 57,
+      "watchRetries": 67,
+      "tickSamples": 211,
+      "apiCpuCores": 0.156
+    },
+    {
+      "at": "2026-09-27T13:26:33.919Z",
+      "tickLatenessP95Ms": 114,
+      "redisUsedMemoryBytes": 2894176,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 226,
+      "activeSockets": 56,
+      "watchRetries": 13,
+      "tickSamples": 183,
+      "apiCpuCores": 0.126
+    },
+    {
+      "at": "2026-09-27T13:26:48.878Z",
+      "tickLatenessP95Ms": 135,
+      "redisUsedMemoryBytes": 2917104,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 226,
+      "activeSockets": 56,
+      "watchRetries": 25,
+      "tickSamples": 202,
+      "apiCpuCores": 0.127
+    },
+    {
+      "at": "2026-09-27T13:27:03.877Z",
+      "tickLatenessP95Ms": 120,
+      "redisUsedMemoryBytes": 2917984,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 228,
+      "activeSockets": 66,
+      "watchRetries": 12,
+      "tickSamples": 218,
+      "apiCpuCores": 0.132
+    },
+    {
+      "at": "2026-09-27T13:27:18.886Z",
+      "tickLatenessP95Ms": 172,
+      "redisUsedMemoryBytes": 2963040,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 230,
+      "activeSockets": 66,
+      "watchRetries": 62,
+      "tickSamples": 216,
+      "apiCpuCores": 0.155
+    },
+    {
+      "at": "2026-09-27T13:27:33.919Z",
+      "tickLatenessP95Ms": 174,
+      "redisUsedMemoryBytes": 2974112,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 233,
+      "activeSockets": 68,
+      "watchRetries": 57,
+      "tickSamples": 188,
+      "apiCpuCores": 0.146
+    },
+    {
+      "at": "2026-09-27T13:27:48.888Z",
+      "tickLatenessP95Ms": 187,
+      "redisUsedMemoryBytes": 3044624,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 236,
+      "activeSockets": 71,
+      "watchRetries": 30,
+      "tickSamples": 199,
+      "apiCpuCores": 0.156
+    },
+    {
+      "at": "2026-09-27T13:28:04.050Z",
+      "tickLatenessP95Ms": 174,
+      "redisUsedMemoryBytes": 3000144,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 237,
+      "activeSockets": 73,
+      "watchRetries": 22,
+      "tickSamples": 249,
+      "apiCpuCores": 0.177
+    },
+    {
+      "at": "2026-09-27T13:28:18.979Z",
+      "tickLatenessP95Ms": 166,
+      "redisUsedMemoryBytes": 2999208,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 237,
+      "activeSockets": 73,
+      "watchRetries": 16,
+      "tickSamples": 244,
+      "apiCpuCores": 0.174
+    },
+    {
+      "at": "2026-09-27T13:28:33.891Z",
+      "tickLatenessP95Ms": 288,
+      "redisUsedMemoryBytes": 3030360,
+      "redisMaxmemoryBytes": 188743680,
+      "activeRooms": 240,
+      "activeSockets": 71,
+      "watchRetries": 59,
+      "tickSamples": 234,
+      "apiCpuCores": 0.179
+    }
+  ]
+}
