@@ -1,11 +1,11 @@
 {
   "webImage": {
     "repository": "ghcr.io/optiplex331/halligalli-bossyang-web",
-    "digest": "sha256:0536f2cff4b8176e1c3546ae6cf9c3fd0171162edd688ceebbf672fc1430f774"
+    "digest": "sha256:234cc6b4a30e0e782bd9fa04ee42a1d3eea37f70b348fbb90ca9d91373de3a97"
   },
   "apiImage": {
     "repository": "ghcr.io/optiplex331/halligalli-bossyang-api",
-    "digest": "sha256:4866bb53cb00ae564f13acbcbb9272580a6eeebb88492a67655c443edefe894a"
+    "digest": "sha256:7af9f4bda594f2426b72ef6a0f21f3b6020668f95dd94eb756ed32a17f3063fd"
   },
   "redisImage": {
     "repository": "redis",
