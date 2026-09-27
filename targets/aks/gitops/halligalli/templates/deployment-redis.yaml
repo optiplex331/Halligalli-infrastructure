@@ -32,7 +32,7 @@ spec:
         - name: redis
           image: "{{ .Values.redisImage.repository }}@{{ .Values.redisImage.digest }}"
           command: ["/bin/sh", "-c"]
-          args: ["exec redis-server --save '' --appendonly no --aclfile /etc/redis/users.acl"]
+          args: ["exec redis-server --save '' --appendonly no --maxmemory 180mb --maxmemory-policy noeviction --aclfile /etc/redis/users.acl"]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -55,7 +55,7 @@ spec:
             - >-
               username="$(cat /redis-auth/username)";
               password="$(cat /redis-auth/password)";
-              printf '%s\n%s\n' "user default off" "user ${username} on >${password} ~halligalli:room:* ~halligalli:entry:* ~halligalli:rooms:due ~halligalli:rooms:active &halligalli:room:*:snapshots +ping +hello +client|setinfo +get +set +hget +hset +expire +zadd +zrem +zscore +zcard +zrangebyscore +zremrangebyscore +watch +unwatch +multi +exec +discard +publish +psubscribe +punsubscribe +scan" > /redis-acl/users.acl
+              printf '%s\n%s\n' "user default off" "user ${username} on >${password} ~halligalli:room:* ~halligalli:entry:* ~halligalli:rooms:due ~halligalli:rooms:active &halligalli:room:*:snapshots +ping +hello +client|setinfo +info +get +set +hget +hset +expire +zadd +zrem +zscore +zcard +zrangebyscore +zremrangebyscore +watch +unwatch +multi +exec +discard +publish +psubscribe +punsubscribe +scan" > /redis-acl/users.acl
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
