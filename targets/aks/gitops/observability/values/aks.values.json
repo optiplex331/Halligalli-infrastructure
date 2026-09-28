@@ -4,8 +4,8 @@
 		"digest": "sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893"
 	},
 	"collectorImage": {
-		"repository": "otel/opentelemetry-collector-contrib",
-		"digest": "sha256:125bdbeb7590cc1952c5b3430ecf14063568980c2c93d5b38676cc0446ed8108"
+		"repository": "otel/opentelemetry-collector",
+		"digest": "sha256:0beba82d63792511591522a8d582904b9a8ae81710357bfcab731607b8b0ffe2"
 	},
 	"tempoImage": {
 		"repository": "grafana/tempo",
