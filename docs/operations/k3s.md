@@ -189,7 +189,11 @@ git revert <promotion-commit>
 ```
 
 After the revert PR is merged and the runtime Application is `Synced` and
-`Healthy`, run the three checks above. Do not use `kubectl set image`,
+`Healthy`, wait until the old Web and API Pods are gone, then run the three
+checks above; a `port-forward` to a Service binds one Pod and fails if that Pod
+is still terminating. Argo CD picks up the merge on its next Git poll, which
+took about four minutes in the
+[rollback drill](../../targets/k3s/evidence/rollback-drill-2026-09-27.md). Do not use `kubectl set image`,
 `kubectl rollout undo`, or an independent Web or API rollback; Argo CD
 self-heal would undo them.
 

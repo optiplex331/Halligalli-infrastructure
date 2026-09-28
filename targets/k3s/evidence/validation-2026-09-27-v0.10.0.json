@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "runDate": "2026-09-27",
+  "operation": "rollback",
+  "fromRelease": "v0.10.1",
+  "release": {
+    "releaseTag": "v0.10.0",
+    "productCommit": "c4d752c8ce0a81fca7315196dd979afee86bdbf6",
+    "webDigest": "sha256:0536f2cff4b8176e1c3546ae6cf9c3fd0171162edd688ceebbf672fc1430f774",
+    "apiDigest": "sha256:4866bb53cb00ae564f13acbcbb9272580a6eeebb88492a67655c443edefe894a"
+  },
+  "infrastructureCommit": "5ad2986d782156b7d90d177b254285731bf75f60",
+  "runtime": {
+    "kubernetes": "v1.32.6+k3s1",
+    "readyNodes": 1,
+    "webReplicas": 2,
+    "apiReplicas": 2
+  },
+  "checks": {
+    "preflight": "not-run",
+    "argoApplicationsSyncedHealthy": "passed",
+    "runningPodDigests": "passed",
+    "internalRuntimeSmoke": "passed",
+    "publicSmoke": "passed"
+  },
+  "incidents": [],
+  "retention": {
+    "rawEvidencePublished": false
+  },
+  "drill": "rollback-drill-2026-09-27.md"
+}
