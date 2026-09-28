@@ -1,3 +1,18 @@
+{{- define "halligalli-observability.collectorConfig" -}}
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+exporters:
+  otlp_http/tempo:
+    endpoint: http://halligalli-observability-tempo:4318
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlp_http/tempo]
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -33,6 +48,9 @@ spec:
       app.kubernetes.io/component: collector
   template:
     metadata:
+      annotations:
+        # Restart the Collector when its config changes; a ConfigMap edit alone is not picked up.
+        checksum/config: {{ include "halligalli-observability.collectorConfig" . | sha256sum }}
       labels:
         app.kubernetes.io/name: halligalli-observability
         app.kubernetes.io/component: collector
@@ -76,19 +94,7 @@ metadata:
   name: halligalli-observability-collector
 data:
   config.yaml: |
-    receivers:
-      otlp:
-        protocols:
-          http:
-            endpoint: 0.0.0.0:4318
-    exporters:
-      otlphttp/tempo:
-        endpoint: http://halligalli-observability-tempo:4318
-    service:
-      pipelines:
-        traces:
-          receivers: [otlp]
-          exporters: [otlphttp/tempo]
+{{- include "halligalli-observability.collectorConfig" . | nindent 4 }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
