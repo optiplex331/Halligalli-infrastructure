@@ -15,14 +15,16 @@ This repository owns Terraform, target-specific Deployment Desired State, indepe
 |---|---|---|
 | `container-apps` | Continuously available Live Demo at `play.halligalli.games` | PR-gated desired state with an explicitly approved local Terraform apply |
 | `aks` | Maintained deployment-capable target | Target-scoped promotion and Argo CD GitOps reconciliation during approved validation runs |
-| `k3s` | Single-node target on the shared Linux host | Local SSH API access and target-owned desired state |
+| `k3s` | Single-node target on the shared Linux host | Target-scoped promotion and Argo CD GitOps reconciliation; operator API access through a local SSH tunnel |
 
 Only formal Release Tags with paired Release Images can be promoted. One promotion changes exactly one target's desired-state file.
 
 Target-owned implementation lives under `targets/<target>/`. Container Apps
 owns its Deployment Desired State and Terraform root there. AKS owns its
 Terraform root, GitOps applications, charts and values, target scripts, and
-sanitized validation evidence there. The targets intentionally have different
+sanitized validation evidence there. K3s owns its Terraform root, runtime,
+observability, and edge charts, Argo CD applications, operator scripts, and
+dated evidence there. The targets intentionally have different
 internal structures because they use different delivery models.
 
 ## AKS runtime topology
