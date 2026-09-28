@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "runDate": "2026-09-28",
+  "operation": "promotion",
+  "fromRelease": "v0.10.1",
+  "release": {
+    "releaseTag": "v0.10.2",
+    "productCommit": "6bd254488ea11682b3e82a399a348a6380dd8b96",
+    "webDigest": "sha256:966e9592f0023f69ce36f3ad4652ecec0b14cc9603b377e540af19b9d9c69e79",
+    "apiDigest": "sha256:f638fa123dc0a13b4b98afcbfa2269934695be712f5bf31e1c90e2ec82b5e0d7"
+  },
+  "infrastructureCommit": "04254e3168dd328eabf9a511dfefb5cc5fefa0f4",
+  "runtime": {
+    "kubernetes": "v1.32.6+k3s1",
+    "readyNodes": 1,
+    "webReplicas": 2,
+    "apiReplicas": 2,
+    "preStopSleepSeconds": 10
+  },
+  "checks": {
+    "preflight": "passed",
+    "argoApplicationsSyncedHealthy": "passed",
+    "runningPodDigests": "passed",
+    "internalRuntimeSmoke": "passed",
+    "publicSmoke": "passed"
+  },
+  "incidents": [],
+  "retention": {
+    "rawEvidencePublished": false
+  }
+}
