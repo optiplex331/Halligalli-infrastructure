@@ -1,3 +1,19 @@
+{{- define "halligalli-observability.tempoConfig" -}}
+server:
+  http_listen_port: 3200
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        http:
+          # Tempo 3 binds localhost by default; the Collector reaches it through the Service.
+          endpoint: 0.0.0.0:4318
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/traces
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -36,6 +52,9 @@ spec:
       app.kubernetes.io/component: tempo
   template:
     metadata:
+      annotations:
+        # Restart Tempo when its config changes; a ConfigMap edit alone is not picked up.
+        checksum/config: {{ include "halligalli-observability.tempoConfig" . | sha256sum }}
       labels:
         app.kubernetes.io/name: halligalli-observability
         app.kubernetes.io/component: tempo
@@ -85,18 +104,7 @@ metadata:
   name: halligalli-observability-tempo
 data:
   config.yaml: |
-    server:
-      http_listen_port: 3200
-    distributor:
-      receivers:
-        otlp:
-          protocols:
-            http:
-    storage:
-      trace:
-        backend: local
-        local:
-          path: /var/tempo/traces
+{{- include "halligalli-observability.tempoConfig" . | nindent 4 }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
