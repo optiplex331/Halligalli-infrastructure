@@ -56,6 +56,12 @@ spec:
               mountPath: /etc/nginx/conf.d
             - name: nginx-tmp
               mountPath: /tmp
+          # Keep serving while the endpoint removal reaches every proxy, so requests that start
+          # during a rollout are not routed to a Pod that already stopped.
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 10
           readinessProbe:
             httpGet:
               path: /

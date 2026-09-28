@@ -74,7 +74,8 @@ Pod and failed when the Pod left. Rerun a minute later, when all four Pods were 
 2. The rollout still produces a short burst of errors for requests that start during it. The
    API Pods have no `preStop` delay, so a terminating Pod stops serving while it can still be
    selected through the Service; three HTTP 502s and four failed connections match that window.
-   A short `preStop` sleep before shutdown is the likely fix; it is not changed by this drill.
+   A short `preStop` sleep before shutdown is the likely fix; it was added to the k3s and AKS
+   Web and API Deployments after this drill.
 3. `kubectl port-forward` to a Service binds one Pod, so run the internal runtime smoke only after
    the old Pods are gone, not as soon as the Application reports `Healthy`.
 4. Argo CD's polling interval dominates the time to roll back (about four minutes of the
